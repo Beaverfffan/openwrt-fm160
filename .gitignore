@@ -1,0 +1,6 @@
+*.ipk
+*.tar.gz
+ipks-*/
+_tmp/
+tmp/
+.DS_Store
