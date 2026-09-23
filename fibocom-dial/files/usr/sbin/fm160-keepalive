@@ -45,6 +45,58 @@ dial_v6()    { ucig dial_v6 || echo 1; }
 
 usbmode_for() { case "$1" in ecm) echo 33;; qmap) echo 32;; *) echo 30;; esac; }
 
+# ── modesw (USB profile switch) state machine ──────────────────────────────
+# fm160d drives every profile change through a state machine; the status
+# snapshot exposes it as modesw.{state_raw,current,target,last_error}:
+#   state_raw: 0=idle  1=reading profile list  2=applying  3=verifying  4=stuck
+# A setusbmode reply only means the WRITE was accepted — the module then
+# re-enumerates, which takes 30-90 s.  So: never sleep a fixed number and
+# assume; poll the machine until it actually settles at the target profile.
+msw_snapshot() { ubus call fm160 status 2>/dev/null; }
+
+# wait_modesw <target|empty> <timeout_s> -> 0 settled (idle, at target if
+# given), 1 timeout or stuck.  One ubus read per poll, filtered twice —
+# `read a b` would split ONE line across vars and drop the second line.
+wait_modesw() {
+	local target=$1 timeout=$2 elapsed=0 snap st cur
+	while [ "$elapsed" -lt "$timeout" ]; do
+		snap=$(msw_snapshot)
+		st=$(echo "$snap" | jsonfilter -e '@.modesw.state_raw' 2>/dev/null)
+		cur=$(echo "$snap" | jsonfilter -e '@.modesw.current' 2>/dev/null)
+		if [ "$st" = "4" ]; then
+			log "modesw stuck (want $target): $(echo "$snap" | jsonfilter -e '@.modesw.last_error' 2>/dev/null)"
+			return 1
+		fi
+		if [ "$st" = "0" ]; then
+			if [ -z "$target" ] || [ "$cur" = "$target" ]; then
+				return 0
+			fi
+		fi
+		sleep 3; elapsed=$((elapsed + 3))
+	done
+	log "modesw settle${target:+ to $target} timed out after ${timeout}s (state=${st:-?} current=${cur:-?})"
+	return 1
+}
+
+# request_mode <mode> -> echoes the reply result (applying|already|refused|
+# busy|not-ready|error).  Retries once after the machine goes idle when the
+# refusal was a transient gate (busy / not-ready) rather than a real refusal.
+request_mode() {
+	local mode=$1 r=error i
+	for i in 1 2; do
+		r=$(ubus call fm160 setusbmode "{\"mode\":$mode}" 2>/dev/null \
+			| jsonfilter -e '@.result' 2>/dev/null)
+		[ -n "$r" ] || r=error
+		case "$r" in
+			applying|already) echo "$r"; return 0 ;;
+		esac
+		log "setusbmode $mode -> $r (attempt $i, detail: $(msw_snapshot | jsonfilter -e '@.modesw.last_error' 2>/dev/null))"
+		[ "$i" = 1 ] && wait_modesw "" 45
+	done
+	echo "$r"
+	[ "$r" = already ]
+}
+
 # ── state file ─────────────────────────────────────────────────────────────
 state_write() {
 	# $1=state $2=last_check $3=last_targets
@@ -57,6 +109,8 @@ window_start=$WSTART
 window_rounds=$WCOUNT
 reloads=$RELOADS
 total_rounds=$TOTAL
+last_reload=${LAST_RELOAD:-}
+last_reload_at=${LAST_RELOAD_AT:-0}
 last_change=$(date +%s)
 EOF
 }
@@ -108,13 +162,13 @@ sweep_dhcp() {
 }
 
 reload_modem() {
-	local want other live
+	local want other live r1 r2 ok
 	# Prefer the mode the module is ACTUALLY in (ubus), not the config:
 	# dial_mode is only written after a LuCI mode switch, so a fresh
 	# config misleads this bounce — 2026-09-23 incident: an ECM box
 	# defaulted to mbim here, bounced 30->32->30, and the dial never
 	# came back until the mode was restored by hand.
-	live=$(ubus call fm160 status 2>/dev/null | jsonfilter -e '@.usb_mode' 2>/dev/null)
+	live=$(msw_snapshot | jsonfilter -e '@.usb_mode' 2>/dev/null)
 	case "$live" in
 		33|32|30) want=$live ;;
 		*)	want=$(usbmode_for "$(ucig dial_mode || echo ecm)") ;;
@@ -125,11 +179,48 @@ reload_modem() {
 		*)  other=32 ;;
 	esac
 	log "module reload: bounce usb mode $want -> $other -> $want"
+	# Take the interface DOWN before the bounce, not after: if it is
+	# still up when usb0 re-appears, netifd respawns the DHCP client on
+	# its own and a later teardown orphans it (2026-09-23: one orphan
+	# survived every sweep this way).  Down first -> the whole post-
+	# bounce DHCP lifecycle belongs to the single ctl up below.
+	ifdown fm160 2>/dev/null || ubus call network.interface.fm160 down >/dev/null 2>&1
+	sleep 2
+	sweep_dhcp
 	clean_orphan_dhcp
-	ubus call fm160 setusbmode "{\"mode\":$other}" >/dev/null 2>&1
-	sleep 12
-	ubus call fm160 setusbmode "{\"mode\":$want}" >/dev/null 2>&1
-	# ensure_usb_mode inside ctl up waits for the device to come back
+
+	# Phase 1: drop to the other profile and let the data path fully
+	# reset.  A too-quick bounce back is a no-op reset — the module never
+	# notices — so dwell a few seconds in the other profile by design.
+	r1=$(request_mode "$other")
+	if [ "$r1" != already ]; then
+		wait_modesw "$other" 60 || log "phase 1 settle incomplete, continuing anyway"
+		sleep 5
+	fi
+
+	# Phase 2: back to the working profile, verified via the state
+	# machine (not a blind sleep).  ctl up's ensure_usb_mode re-checks
+	# the profile too, so a false "ok" here still cannot misdial.
+	r2=$(request_mode "$want")
+	ok=0
+	if [ "$r2" = already ]; then
+		ok=1
+	elif wait_modesw "$want" 120; then
+		ok=1
+	fi
+	# The bounce tore the data path down underneath every usb0 udhcpc:
+	# the pre-bounce clients are all reparented orphans now and the new
+	# dial has not started yet, so a full sweep here cannot hit anyone
+	# legitimate (same reasoning as sweep_dhcp after ifdown).
+	sweep_dhcp
+	LAST_RELOAD=$ok; LAST_RELOAD_AT=$(date +%s)
+	if [ "$ok" = 1 ]; then
+		log "module reload done: settled at mode $want (r1=$r1 r2=$r2)"
+		op 模块重载 "USB 弹跳 $want→$other→$want，状态机确认回到 $want" 成功
+	else
+		log "module reload UNCONFIRMED (r1=$r1 r2=$r2, error: $(msw_snapshot | jsonfilter -e '@.modesw.last_error' 2>/dev/null))"
+		op 模块重载 "USB 弹跳 $want→$other→$want 未确认 settled（r1=$r1 r2=$r2）" 异常
+	fi
 	"$CTL" up >/dev/null 2>&1
 }
 
@@ -182,6 +273,7 @@ run() {
 	trap 'rm -f "$PIDFILE" "$STATE"; exit 0' TERM INT
 
 	CONSEC=0; WSTART=$(date +%s); WCOUNT=0; RELOADS=0; TOTAL=0; TARGETS=""
+	LAST_RELOAD=; LAST_RELOAD_AT=0
 	state_write running wait ""
 	log "started (interval=$(ka_interval)s reload=$(ka_reload) stop=$(ka_stop))"
 
@@ -240,14 +332,15 @@ run() {
 		if [ "$CONSEC" -ge "$(ka_reload)" ]; then
 			RELOADS=$((RELOADS + 1)); CONSEC=0
 			state_write running reload "$TARGETS"
-			op 模块重载 "连续失败达阈值，USB 模式弹跳" 已执行
 			reload_modem
+			# 弹跳 30-90s + 拨号 20-90s，宽限拉长到 180s
+			GRACE_UNTIL=$(($(date +%s) + 180))
 		else
 			state_write running fail "$TARGETS"
 			op 自动重拨 "保活检测到链路失败" 已执行
 			redial
+			GRACE_UNTIL=$(($(date +%s) + 90))
 		fi
-		GRACE_UNTIL=$(($(date +%s) + 90))
 	done
 }
 
@@ -276,7 +369,7 @@ stop() {
 jstr() { printf '"%s"' "$(echo "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
 
 status() {
-	local state= idle last_check= last_targets= consec_fail=0 window_rounds=0 reloads=0 total_rounds=0
+	local state= idle last_check= last_targets= consec_fail=0 window_rounds=0 reloads=0 total_rounds=0 last_reload= last_reload_at=0
 	[ -f "$STATE" ] && . "$STATE"
 	local s=${state:-idle}
 	[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null || { [ "$s" = running ] && s=dead; }
@@ -286,7 +379,8 @@ status() {
  "dns4": $(jstr "$(ka_dns4)"), "dns6": $(jstr "$(ka_dns6)"),
  "state": "$s", "last_check": "$last_check", "last_targets": $(jstr "$last_targets"),
  "consec_fail": ${consec_fail:-0}, "window_rounds": ${window_rounds:-0},
- "reloads": ${reloads:-0}, "total_rounds": ${total_rounds:-0}}
+ "reloads": ${reloads:-0}, "total_rounds": ${total_rounds:-0},
+ "last_reload": "$last_reload", "last_reload_at": ${last_reload_at:-0}}
 EOF
 }
 
