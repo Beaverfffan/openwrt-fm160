@@ -1,0 +1,262 @@
+#!/bin/sh
+# fm160-keepalive - dial keepalive for the three FM160 dial paths.
+#
+# After the link comes up, every ka_interval seconds one round pings the
+# module-reported DNS (v4 and/or v6, honouring dial_v4/dial_v6) through the
+# carrier path:
+#
+#   round OK            -> counters reset
+#   round fail          -> redial (ifdown + fm160-dial-ctl up)
+#   ka_reload_rounds consecutive fails
+#                       -> module reload (USB profile bounce) + redial
+#   ka_stop_rounds rounds inside a 24 h sliding window
+#                       -> give up: log, mark stopped, exit
+#
+# DNS defaults to what netifd reports for network.fm160 (all three protos
+# push the module's DNS servers).  ka_dns4/ka_dns6 override per family.
+#
+# Usage:
+#   fm160-keepalive run     daemon loop (started via setsid by dial-ctl up)
+#   fm160-keepalive start   start daemon if not already running
+#   fm160-keepalive stop    stop daemon
+#   fm160-keepalive status  JSON snapshot (settings + counters)
+#
+# State lives in /var/run (tmpfs): counters intentionally reset on reboot,
+# which also restarts the 24 h window.
+
+CFG=fm160
+STATE=/var/run/fm160-keepalive.state
+PIDFILE=/var/run/fm160-keepalive.pid
+CTL=/usr/sbin/fm160-dial-ctl
+
+log() { logger -t fm160-keepalive "$*"; }
+op()  { /usr/sbin/fm160-oplog add keepalive "$1" "$2" "$3" 2>/dev/null; }
+
+ucig() { uci -q get "$CFG".main."$1"; }
+
+ka_enable()  { local v; v=$(ucig ka_enable); echo "${v:-1}"; }
+ka_interval(){ ucig ka_interval || echo 30; }
+ka_reload()  { ucig ka_reload_rounds || echo 5; }
+ka_stop()    { ucig ka_stop_rounds || echo 10; }
+ka_dns4()    { ucig ka_dns4; }
+ka_dns6()    { ucig ka_dns6; }
+dial_v4()    { ucig dial_v4 || echo 1; }
+dial_v6()    { ucig dial_v6 || echo 1; }
+
+usbmode_for() { case "$1" in ecm) echo 33;; qmap) echo 32;; *) echo 30;; esac; }
+
+# ── state file ─────────────────────────────────────────────────────────────
+state_write() {
+	# $1=state $2=last_check $3=last_targets
+	cat > "$STATE" <<EOF
+state=$1
+last_check=$2
+last_targets=$3
+consec_fail=$CONSEC
+window_start=$WSTART
+window_rounds=$WCOUNT
+reloads=$RELOADS
+total_rounds=$TOTAL
+last_change=$(date +%s)
+EOF
+}
+
+# ── link facts ─────────────────────────────────────────────────────────────
+ifstatus()  { ubus call network.interface.fm160 status 2>/dev/null; }
+link_up()   { [ "$(ifstatus | jsonfilter -e '@.up' 2>/dev/null)" = "true" ]; }
+
+# DNS reported by the module via netifd, split per family.  Echoes one per
+# line; empty when the family has no server (caller falls back).
+dns_from_netif() {
+	ifstatus | jsonfilter -e '@["dns-server"][@]' 2>/dev/null
+}
+
+has_addr4() { [ -n "$(ifstatus | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null)" ]; }
+has_addr6() { [ -n "$(ifstatus | jsonfilter -e '@["ipv6-address"][0].address' 2>/dev/null)" ]; }
+
+# ── ping ───────────────────────────────────────────────────────────────────
+ping4() { ping -c 1 -W 4 "$1" >/dev/null 2>&1; }
+ping6() { ping -6 -c 1 -W 4 "$1" >/dev/null 2>&1; }
+
+# ── module reload: bounce the USB profile to the other mode and back ───────
+# Proven recovery for a wedged module endpoint (see notes §23 坑1): a plain
+# redial is not enough once the modem side stops answering.
+reload_modem() {
+	local m want other
+	m=$(ucig dial_mode); m=${m:-mbim}
+	want=$(usbmode_for "$m")
+	case "$want" in
+		33) other=30 ;;
+		32) other=30 ;;
+		*)  other=32 ;;
+	esac
+	log "module reload: bounce usb mode $want -> $other -> $want"
+	ubus call fm160 setusbmode "{\"mode\":$other}" >/dev/null 2>&1
+	sleep 12
+	ubus call fm160 setusbmode "{\"mode\":$want}" >/dev/null 2>&1
+	# ensure_usb_mode inside ctl up waits for the device to come back
+	"$CTL" up >/dev/null 2>&1
+}
+
+redial() {
+	log "redial: ifdown fm160, then ctl up"
+	ifdown fm160 2>/dev/null || ubus call network.interface.fm160 down >/dev/null 2>&1
+	sleep 5
+	"$CTL" up >/dev/null 2>&1
+}
+
+# ── one check round ────────────────────────────────────────────────────────
+# Honours dial_v4/dial_v6: only enabled families are checked.  Return codes:
+#   0  every enabled family with an address answered the ping
+#   1  at least one enabled family failed (or the link is not up at all)
+#   2  nothing to check yet (link up but no address configured) — neutral
+check_round() {
+	local t4= t6= desc= checkable=0 ok=1
+
+	# 接口没起 = 失败（触发重拨），不能只跳过 —— 否则 setup 挂死会被掩盖
+	link_up || { TARGETS="link-down"; return 1; }
+
+	if [ "$(dial_v4)" = 1 ] && has_addr4; then
+		checkable=1
+		t4=$(ka_dns4)
+		[ -z "$t4" ] && t4=$(dns_from_netif | grep -m1 '\.')
+		[ -z "$t4" ] && t4=223.5.5.5
+		ping4 "$t4" || ok=0
+		desc="v4=$t4"
+	fi
+	if [ "$(dial_v6)" = 1 ] && has_addr6; then
+		checkable=1
+		t6=$(ka_dns6)
+		[ -z "$t6" ] && t6=$(dns_from_netif | grep -m1 ':')
+		[ -z "$t6" ] && t6=240c::6666
+		ping6 "$t6" || ok=0
+		[ -n "$desc" ] && desc="$desc "
+		desc="${desc}v6=$t6"
+	fi
+	TARGETS=$desc
+	[ "$checkable" = 0 ] && return 2
+	return $((1 - ok))
+}
+
+# ── daemon ─────────────────────────────────────────────────────────────────
+run() {
+	local now
+	echo $$ > "$PIDFILE"
+	trap 'rm -f "$PIDFILE" "$STATE"; exit 0' TERM INT
+
+	CONSEC=0; WSTART=$(date +%s); WCOUNT=0; RELOADS=0; TOTAL=0; TARGETS=""
+	state_write running wait ""
+	log "started (interval=$(ka_interval)s reload=$(ka_reload) stop=$(ka_stop))"
+
+	# wait for the link before the first round; bail out on disable
+	while ! link_up; do
+		[ "$(ka_enable)" = 0 ] && { state_write disabled wait ""; exit 0; }
+		sleep 5
+	done
+	log "link up, keepalive active"
+	op 保活启动 "巡检间隔=$(ka_interval)s 重载阈值=$(ka_reload) 放弃阈值=$(ka_stop)" 运行中
+
+	# 重拨/重载后的宽限期：拨号要 20-90s，期间不算失败
+	GRACE_UNTIL=0
+
+	while :; do
+		sleep "$(ka_interval)" 2>/dev/null || exit 0
+		[ "$(ka_enable)" = 0 ] && { log "disabled by config"; state_write disabled wait ""; exit 0; }
+
+		now=$(date +%s)
+		if [ "$now" -lt "$GRACE_UNTIL" ]; then
+			state_write running waiting "$TARGETS"
+			continue
+		fi
+
+		check_round
+		case $? in
+		 2)
+			# 链路起但地址未就位（拨号刚完成）：中性跳过
+			state_write running wait "$TARGETS"
+			continue ;;
+		 0)
+			if [ "$CONSEC" != 0 ] || [ "$WCOUNT" != 0 ]; then
+				log "round ok (targets: $TARGETS), counters reset"
+			fi
+			CONSEC=0
+			state_write running ok "$TARGETS"
+			continue ;;
+		esac
+
+		CONSEC=$((CONSEC + 1)); TOTAL=$((TOTAL + 1))
+		if [ $((now - WSTART)) -gt 86400 ]; then
+			WSTART=$now; WCOUNT=0
+		fi
+		WCOUNT=$((WCOUNT + 1))
+		log "round FAIL $CONSEC consecutive (24h window $WCOUNT/$(ka_stop)) targets: $TARGETS"
+		op 保活检查失败 "第 $CONSEC 次连续失败（24h 窗口 $WCOUNT/$(ka_stop)）目标: $TARGETS" 失败
+
+		if [ "$WCOUNT" -ge "$(ka_stop)" ]; then
+			log "auto stop: $(ka_stop) failed rounds within 24h, giving up"
+		op 自动放弃 "24h 内失败 $(ka_stop) 轮，停止保活" 已停止
+			state_write stopped giveup "$TARGETS"
+			rm -f "$PIDFILE"
+			exit 0
+		fi
+
+		if [ "$CONSEC" -ge "$(ka_reload)" ]; then
+			RELOADS=$((RELOADS + 1)); CONSEC=0
+			state_write running reload "$TARGETS"
+			op 模块重载 "连续失败达阈值，USB 模式弹跳" 已执行
+			reload_modem
+		else
+			state_write running fail "$TARGETS"
+			op 自动重拨 "保活检测到链路失败" 已执行
+			redial
+		fi
+		GRACE_UNTIL=$(($(date +%s) + 90))
+	done
+}
+
+start() {
+	local pid
+	[ "$(ka_enable)" = 0 ] && return 0
+	pid=$(cat "$PIDFILE" 2>/dev/null)
+	if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+		return 0
+	fi
+	rm -f "$PIDFILE" "$STATE"
+	setsid sh -c "exec /usr/sbin/fm160-keepalive run" </dev/null >/dev/null 2>&1 &
+}
+
+stop() {
+	local pid
+	pid=$(cat "$PIDFILE" 2>/dev/null)
+	if [ -n "$pid" ]; then
+		kill "$pid" 2>/dev/null
+		sleep 1
+		kill -9 "$pid" 2>/dev/null
+	fi
+	rm -f "$PIDFILE" "$STATE"
+}
+
+jstr() { printf '"%s"' "$(echo "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+
+status() {
+	local state= idle last_check= last_targets= consec_fail=0 window_rounds=0 reloads=0 total_rounds=0
+	[ -f "$STATE" ] && . "$STATE"
+	local s=${state:-idle}
+	[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null || { [ "$s" = running ] && s=dead; }
+	cat <<EOF
+{"enable": $(ka_enable), "interval": $(ka_interval),
+ "reload_rounds": $(ka_reload), "stop_rounds": $(ka_stop),
+ "dns4": $(jstr "$(ka_dns4)"), "dns6": $(jstr "$(ka_dns6)"),
+ "state": "$s", "last_check": "$last_check", "last_targets": $(jstr "$last_targets"),
+ "consec_fail": ${consec_fail:-0}, "window_rounds": ${window_rounds:-0},
+ "reloads": ${reloads:-0}, "total_rounds": ${total_rounds:-0}}
+EOF
+}
+
+case "$1" in
+	run)    run ;;
+	start)  start ;;
+	stop)   stop ;;
+	status) status ;;
+	*) echo "usage: $0 {run|start|stop|status}" >&2; exit 2 ;;
+esac

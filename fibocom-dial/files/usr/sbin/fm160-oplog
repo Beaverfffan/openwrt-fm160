@@ -1,0 +1,41 @@
+#!/bin/sh
+# fm160-oplog - unified, semantic operation log for the FM160 stack.
+#
+# Every actor (LuCI actions, dial-ctl, keepalive, netifd protos, fm160d)
+# appends one JSON line per executed operation:
+#   {"ts":<epoch>,"actor":"...","action":"...","detail":"...","result":"..."}
+# The file is a ring buffer (default 300 lines) at /var/log/fm160-ops.log.
+# Usage:
+#   fm160-oplog add <actor> <action> <detail> <result>
+#   fm160-oplog tail [n]     -> last n lines (default 50), oldest first
+#   fm160-oplog clear
+
+LOG=/var/log/fm160-ops.log
+MAX=300
+
+jesc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+case "$1" in
+	add)
+		actor=$2; action=$3; detail=$4; result=$5
+		printf '{"ts":%s,"actor":"%s","action":"%s","detail":"%s","result":"%s"}\n' \
+			"$(date +%s)" "$(jesc "$actor")" "$(jesc "$action")" \
+			"$(jesc "$detail")" "$(jesc "$result")" >> "$LOG"
+		# 环形截断（保最新 MAX 行）
+		n=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+		if [ "$n" -gt "$MAX" ]; then
+			tail -n "$MAX" "$LOG" > "$LOG.tmp"
+			mv "$LOG.tmp" "$LOG"
+		fi
+		;;
+	tail)
+		tail -n "${2:-50}" "$LOG" 2>/dev/null
+		;;
+	clear)
+		: > "$LOG"
+		;;
+	*)
+		echo "usage: $0 {add <actor> <action> <detail> <result>|tail [n]|clear}" >&2
+		exit 2
+		;;
+esac

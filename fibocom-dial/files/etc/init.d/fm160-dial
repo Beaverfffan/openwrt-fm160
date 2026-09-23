@@ -1,0 +1,20 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# fm160-dial -- boot-time autodial for QMAP / MBIM modes.
+#
+# ECM autodials inside fm160d (AT path); QMAP/MBIM are orchestrated by
+# /usr/sbin/fm160-dial-ctl and nothing else brings them up after a reboot.
+# Honour fm160.main.dial_autostart, dial_mode; stay out of the way otherwise.
+
+START=99
+
+start() {
+	[ "$(uci -q get fm160.main.dial_autostart)" = "1" ] || return 0
+	case "$(uci -q get fm160.main.dial_mode)" in
+		qmap|mbim) ;;
+		*) return 0 ;;   # ecm 或未设置：fm160d 自己管
+	esac
+	# up 会阻塞到 USB 切换/拨号下发完成，放到后台不拖住 boot
+	( sleep 10; /usr/sbin/fm160-dial-ctl up >/dev/null 2>&1 ) &
+}

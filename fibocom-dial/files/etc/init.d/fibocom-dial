@@ -1,0 +1,27 @@
+#!/bin/sh /etc/rc.common
+# fibocom-dial —— 广和通厂商 QMI 栈拨号器（固件 B / vendor 变体专用）
+#
+# 默认禁用。仅在以下条件下启用：
+#   1) 模组已切到 QMI 模式（GTUSBMODE 32）
+#   2) fm160d 的 ECM 自动拨号已关闭（/etc/config/fm160 main.dial_autostart=0
+#      或 ubus call fm160 dial_config），否则两个拨号器会抢同一路数据会话
+# 启用：uci set fibocom-dial.main.enabled=1 && /etc/init.d/fibocom-dial enable && start
+START=92
+STOP=10
+USE_PROCD=1
+
+start_service() {
+    local enabled apn
+
+    config_load fibocom-dial
+    config_get enabled main enabled 0
+    [ "$enabled" = "1" ] || return 0
+    config_get apn main apn ctnet
+
+    procd_open_instance fibocom-dial
+    procd_set_param command /usr/bin/fibocom-dial -4 -6 -s "$apn"
+    procd_set_param respawn 3600 5 5
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_close_instance
+}
