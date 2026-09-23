@@ -81,6 +81,32 @@ ping6() { ping -6 -c 1 -W 4 "$1" >/dev/null 2>&1; }
 # ── module reload: bounce the USB profile to the other mode and back ───────
 # Proven recovery for a wedged module endpoint (see notes §23 坑1): a plain
 # redial is not enough once the modem side stops answering.
+# SIGKILL udhcpc orphans: any usb0 udhcpc reparented to init (ppid 1) is a
+# leftover from an earlier dial attempt whose ecm-dhcp.sh parent a teardown
+# already reaped — nothing else will ever clean it (seen: 10 piled up after
+# a keepalive storm).  Must be SIGKILL, not TERM: a graceful udhcpc runs
+# the deconfig script on exit and pushes a zero-address update into netifd,
+# wiping the lease the live client just obtained.
+clean_orphan_dhcp() {
+	local p
+	for p in $(pgrep -f "udhcpc .*-i usb0" 2>/dev/null); do
+		[ "$(cat /proc/$p/comm 2>/dev/null)" = udhcpc ] || continue
+		[ "$(awk '{print $4}' /proc/$p/stat 2>/dev/null)" = 1 ] && kill -9 "$p" 2>/dev/null
+	done
+}
+
+# After ifdown, every surviving usb0 udhcpc is an orphan by definition (the
+# legit client belongs to the proto tree the teardown just reaped), so a
+# full sweep there is safe — unlike mid-attempt, where the live one must be
+# spared (and ppid cannot tell them apart: the about-to-be-orphaned client
+# still points at its doomed parent when the sweep would run).
+sweep_dhcp() {
+	local p
+	for p in $(pgrep -f "udhcpc .*-i usb0" 2>/dev/null); do
+		[ "$(cat /proc/$p/comm 2>/dev/null)" = udhcpc ] && kill -9 "$p" 2>/dev/null
+	done
+}
+
 reload_modem() {
 	local want other live
 	# Prefer the mode the module is ACTUALLY in (ubus), not the config:
@@ -99,6 +125,7 @@ reload_modem() {
 		*)  other=32 ;;
 	esac
 	log "module reload: bounce usb mode $want -> $other -> $want"
+	clean_orphan_dhcp
 	ubus call fm160 setusbmode "{\"mode\":$other}" >/dev/null 2>&1
 	sleep 12
 	ubus call fm160 setusbmode "{\"mode\":$want}" >/dev/null 2>&1
@@ -109,7 +136,9 @@ reload_modem() {
 redial() {
 	log "redial: ifdown fm160, then ctl up"
 	ifdown fm160 2>/dev/null || ubus call network.interface.fm160 down >/dev/null 2>&1
-	sleep 5
+	sleep 2
+	sweep_dhcp
+	sleep 3
 	"$CTL" up >/dev/null 2>&1
 }
 
