@@ -10,6 +10,7 @@ define Package/fibocom-dial
   CATEGORY:=Utilities
   TITLE:=Fibocom Dial (vendor QMI stack, QMAP aggregation)
   DEPENDS:=+libpthread
+  CONFLICTS:=uqmi modemmanager
 endef
 
 define Package/fibocom-dial/description
@@ -19,6 +20,11 @@ define Package/fibocom-dial/description
   and multi-pdn-manager (up to 8 concurrent PDNs).
   Pairs with the vendor qmi_wwan_f kernel driver; keep disabled unless the
   module runs in QMI mode (GTUSBMODE 32) with fm160d ECM autodial off.
+  CONFLICTS uqmi/modemmanager: both grab the same cdc-wdm QMI control
+  channel / WDS clients and silently break the vendor dial flow. The
+  open-source uqmi dial path (fm160-qmi) was dropped on 2026-09-22 after
+  its data plane failed verification (RX=0), so the vendor CLI stack is
+  the only supported QMI dialer.
 endef
 
 define Build/Prepare

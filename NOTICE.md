@@ -9,8 +9,9 @@
 | `fm160d/` | 模组管理守护进程（策略层） |
 | `luci-app-fm160/` | LuCI 应用 |
 | `luci-proto-ecm-fm160/` `luci-proto-qmi-fm160/` `luci-proto-mbim-fm160/` | 三个拨号协议插件 |
-| `fm160-qmi/` | 全开源 QMI 拨号替代实现 |
 | `fibocom-dial/files/` | FM160 控制脚本集（dial-ctl / keepalive / oplog / mbim / qmap） |
+
+（`fm160-qmi/` 全开源 QMI 拨号替代已于 2026-09-22 移除：数据面实测未打通。）
 
 ## 2. `at-daemon/` — vendored from QModem（MPL-2.0 + 禁止商用附加条款）
 

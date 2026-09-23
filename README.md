@@ -15,7 +15,6 @@
 | `fm160d/` | `fm160d` | 模组管理守护进程：轮询调度、状态解析、ECM 拨号、USB 配置切换、短信、GNSS、LAN IPv6、ubus 后端 |
 | `fibocom-dial/` | `fibocom-dial` | 厂商 QMI 拨号套件（vendored coolsnowwolf/lede）+ FM160 控制脚本集（dial-ctl/keepalive/oplog/mbim/qmap） |
 | `qmi-wwan-f/` | `kmod-qmi-wwan-f` | 厂商 QMI WWAN 驱动（QMAP 必需） |
-| `fm160-qmi/` | `fm160-qmi` | **全开源** QMI 拨号替代（stock `qmi_wwan` + `uqmi`，零厂商二进制） |
 | `luci-proto-ecm-fm160/` | — | ECM 拨号协议插件 |
 | `luci-proto-qmi-fm160/` | — | QMAP 拨号协议插件（走 fibocom-dial） |
 | `luci-proto-mbim-fm160/` | — | MBIM 拨号协议插件（vendor CLI，非原生 umbim） |
@@ -45,7 +44,11 @@ make package/fm160d/compile package/luci-app-fm160/compile -j4
 | ECM（默认） | GTUSBMODE 33 | 模组 DHCP | 最成熟，双栈 + LAN 前缀由 fm160d 完整支持 |
 | MBIM | GTUSBMODE 30 | wwan0 vendor CLI | 实测单流速度最佳（15-20 MB/s） |
 | QMAP | GTUSBMODE 32 | wwan0 + qmi_wwan_f | 厂商驱动 QMAP 聚合，多通道能力 |
-| 开源 QMI | GTUSBMODE 32 | stock qmi_wwan + uqmi | `fm160-qmi` 包，零厂商二进制，无 QMAP |
+
+> 不再有「开源 QMI（uqmi）」模式：`fm160-qmi` 包已于 2026-09-22 移除——
+> 当晚实测其数据面从未打通（拨号拿到地址但 RX=0），且 uqmi/modemmanager
+> 会与 fibocom-dial 抢占同一 QMI 控制通道。`fibocom-dial` 已声明
+> `CONFLICTS:=uqmi modemmanager`，opkg 会直接报冲突。
 
 三模式共用 `fm160-dial-ctl` 与拨号页；切换模式会自动重启 USB 配置（30-90 s）。
 
