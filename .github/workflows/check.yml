@@ -1,0 +1,93 @@
+name: check
+
+# The gates in tools/ catch the failures that no build step reports: a front-end
+# file with a missing bracket (a blank page, not a build error), an init script
+# with CRLF endings (installs fine, never starts), a .po whose msgids are not
+# whitespace-canonical (compiles to a .lmo that translates nothing), and a
+# diagnostics bundle whose buffer is one byte short (refused on the device, and
+# indistinguishable from a broken page).
+#
+# What this does NOT do is build the packages.  That needs an OpenWrt tree and
+# the target toolchain, and takes hours; the point of these gates is that they
+# are cheap enough to run on every push.  Packaging is verified on the build
+# machine -- see docs/BUILD-ISTOREOS-H69K.md.
+#
+# tools/hosttest/diag-export-test.sh runs here for real: it is the one gate that
+# a Windows workstation cannot run (it needs a Linux cc, because diag.c includes
+# fm160d.h and therefore the real libubox headers, which do not compile for a
+# Windows target), and this runner is exactly the host it wants.  On the
+# workstation tools/check.sh reports it as SKIPPED rather than failed, which is
+# why STRICT exists.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # tools/jscheck parses every view with node's own parser, and
+          # tools/i18n/check.py runs the real cbi.js to get its sfh().
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install zig
+        # tools/cccheck compiles fm160d against the real libubox/libubus
+        # headers in tools/cccheck/include.  zig cc ships musl, which is the
+        # libc family of the target firmware.
+        run: pip install ziglang
+
+      - name: Fetch luci (the translation gates compare against it)
+        # tools/i18n/check.py needs three things from a luci tree: the real
+        # cbi.js, so the hash comparison runs the shipped implementation rather
+        # than a copy, luci-base's zh_Hans catalogue, and every OTHER module's
+        # catalogue as well -- 92 more of them.
+        #
+        # Not just luci-base, because load_catalog() merges every *.zh-cn.lmo
+        # into one namespace, so a key shared with ANY installed module is
+        # resolved by whichever archive a reader opens.  The collision gate has
+        # a direction for each case, and a one-catalogue pool gets both wrong:
+        # a context we keep is reported as pointless when the collision is with
+        # another module, and a key luci-base does translate differently is
+        # never seen because the pool is too small to hold the collision the
+        # other direction looks for.
+        #
+        # The branch is the luci the firmware ships, not master, and for the
+        # same reason: it is the catalogue set that decides both directions.
+        #
+        # Only the catalogues and those two files are wanted, hence the
+        # blob-less sparse clone.  --no-cone, because the pattern is a glob.
+        run: |
+          git clone -b openwrt-24.10 --depth 1 --filter=blob:none --sparse \
+            https://github.com/openwrt/luci.git "$RUNNER_TEMP/luci"
+          git -C "$RUNNER_TEMP/luci" sparse-checkout set --no-cone \
+            '**/po/zh_Hans/*.po' \
+            modules/luci-base/src \
+            modules/luci-base/htdocs/luci-static/resources
+
+      - name: Show the compilers the gates will find
+        # A gate that reports SKIPPED because cc was missing still fails the
+        # build under STRICT, and the failure reads as "the tree is broken".
+        # Printing what was found makes that diagnosis one line long.
+        run: |
+          cc --version | head -1
+          python3 --version
+          node --version
+
+      - name: Run the gates
+        env:
+          LUCI: ${{ runner.temp }}/luci
+          # Every toolchain above is installed on purpose, so a gate that
+          # skipped has proved nothing and must not leave a green build.
+          STRICT: '1'
+        run: sh tools/check.sh
