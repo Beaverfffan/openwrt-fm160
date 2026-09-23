@@ -1,0 +1,2673 @@
+# Simplified Chinese translation for luci-app-fm160.
+#
+# This file is the source of truth for the translation; it is compiled
+# into fm160.zh-cn.lmo at package build time.  Two things about its
+# shape are deliberate and are checked by tools/i18n/check.py:
+#
+#   The daemon labels.  fm160d publishes its dial step names and its
+#   profile verdicts as strings, and the front end renders them through
+#   _() at the point of display.  No extractor can see those, because
+#   they only exist at run time, so they are hand-written msgids here
+#   and the checker derives the required set from the C source.  Free-
+#   form diagnostic text (dial.last_error) is NOT translated: it names
+#   a specific command, profile number or AT error code, and a half-
+#   translated error is worse than an English one.
+#
+#   The coverage.  This file carries every string the front end can
+#   show: all nine javascript files, the menu titles, and the labels
+#   fm160d publishes from net.c and usbmode.c.  tools/i18n/check.py
+#   fails on any message it can extract that is missing here, so a new
+#   string added to a page is a red gate at the time it is written
+#   rather than an English line that stays English.
+#
+#   The strings that are their own translation (an AT command, an
+#   acronym the UI means literally) are present with an identical
+#   msgstr on purpose: po2lmo omits them from the .lmo, which is what
+#   the readers would fall back to anyway, and carrying them keeps the
+#   rule above simple.
+#
+#   The msgctxt entries.  luci-base ships its own zh-cn catalogue and
+#   load_catalog() merges EVERY *.zh-cn.lmo in the directory into one
+#   namespace, so a msgid we share with luci-base is stored twice and
+#   resolved by whichever archive the reader reaches first -- and it is
+#   not the same archive for the server and the browser, because
+#   lmo_translate_ctxt() returns the FIRST match while window.TR is
+#   built by lmo_iterate() with last-write-wins.  Where our translation
+#   differs from luci-base's, that is a visible coin toss, so those
+#   messages carry a context and occupy a key luci-base never writes.
+#   Sixteen do so today, and the list is whatever the checker finds
+#   rather than a number maintained here -- translating the rest of
+#   the pages is what turned four of them into sixteen, because most
+#   of the collisions are ordinary LuCI words (Band, Speed, Down, Up,
+#   Diagnostics, To) that only collide once they are translated at
+#   all.  The shared msgids that remain translate identically to
+#   luci-base's, so the outcome does not depend on which archive wins
+#   and they are left shared on purpose -- keeping them means following
+#   any later fix to luci-base's wording.  The checker requires both
+#   halves of that: a differing translation must carry a context, and a
+#   context must not appear where nothing collides.  A menu title cannot
+#   take a context (the menu tree carries only `title`), which is why the
+#   Signal page is called "Signal Quality".
+msgid ""
+msgstr ""
+"Project-Id-Version: luci-app-fm160\n"
+"Report-Msgid-Bugs-To: Beaverfffan\n"
+"PO-Revision-Date: 2026-09-19\n"
+"Last-Translator: Beaverfffan\n"
+"Language: zh_Hans\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: fm160/api.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+
+#: view/fm160/gnss.js
+msgid "\"In view\" is what the module itself reports, and \"parsed\" is how many of those satellites were actually present in the NMEA. They are shown side by side on purpose: if they differ, the answer was truncated, and that is a transport problem rather than a sky problem."
+msgstr "「可见」是模组自己报告的，而「已解析」是这些卫星里真正出现在 NMEA 中的数量。两者并排显示是有意为之：如果不一致，说明应答被截断了，那是传输问题而不是天空的问题。"
+
+#: view/fm160/gnss.js
+msgid "\"Uninterpreted\" counts sentences that are well formed but carry nothing this daemon uses, such as VTG and TXT - a non-zero value there is not a problem."
+msgstr "「未解释」统计的是格式正确、但不含本守护进程所用内容的语句，例如 VTG 和 TXT——这项非零不是问题。"
+
+#: view/fm160/cells.js
+msgid "%d band token(s) could not be decoded and are shown elsewhere or omitted. The daemon is talking to a firmware whose encoding differs from the documented one, so locking is best avoided until that is understood."
+msgstr "有 %d 个频段 token 无法解码，已在别处显示或省略。守护进程面对的固件其编码与手册记载不同，在弄清之前最好避免锁定。"
+
+#: view/fm160/dial.js
+msgid "%d consecutive / %d in 24 h / %d total"
+msgstr "%d 连续 / 24 小时内 %d / 累计 %d"
+
+#: view/fm160/overview.js
+msgid "%s, %s MHz, PCI %d, %s"
+msgstr "%s，%s MHz，PCI %d，%s"
+
+#: view/fm160/debug.js
+msgid "(empty response)"
+msgstr "（空应答）"
+
+#: view/fm160/cells.js view/fm160/gnss.js view/fm160/sms.js
+msgid "(no response)"
+msgstr "（无应答）"
+
+#: fm160/api.js
+msgid "(not in the known table)"
+msgstr "（不在已知表里）"
+
+#: view/fm160/sms.js
+msgid "+CMGS reference"
+msgstr "+CMGS 参考号"
+
+#: view/fm160/sms.js
+msgid "-"
+msgstr "-"
+
+#: view/fm160/gnss.js
+msgid ". It is recorded, not interpreted."
+msgstr "。它只被记录，不被解释。"
+
+#: view/fm160/gnss.js
+msgid "0 satellites in view. On this hardware that is the normal reading indoors - the module has antennas, but it needs a view of the sky to find anything."
+msgstr "可见 0 颗卫星。在这套硬件上，室内读到这个数是正常的——模组有天线，但需要看见天空才能搜到目标。"
+
+#: view/fm160/gnss.js
+msgid "A GSV sentence carried one field more than the standard describes (signal id)"
+msgstr "有一条 GSV 语句比标准多带了一个字段（signal id）"
+
+#: view/fm160/dial.js
+msgid "A failed round triggers a redial; after the consecutive-failure threshold the module USB profile is bounced and reloaded; after the 24 h budget is exhausted the watchdog stops by itself."
+msgstr "一轮失败先触发重拨；连续失败达到阈值后模块 USB 配置会被弹掉重载；24 小时预算耗尽后看门狗自行停止。"
+
+#: view/fm160/sms.js
+msgid "A message longer than 160 GSM 7-bit characters is split into numbered segments and sent as several messages; the modem is never asked to do the splitting. The count below is a preview - the daemon decides the real answer when it encodes the text."
+msgstr "超过 160 个 GSM 7 比特字符的消息会被拆成带编号的分段，以多条消息发送；从不要求模组来做拆分。下面的计数只是预览——真正的结果由守护进程在编码正文时决定。"
+
+#: view/fm160/sms.js
+msgid "A modem without a SIM answers AT+CPMS? with ERROR; that is the usual cause here, and it is not a fault in the daemon. The setup is retried a few times and then left alone, because a question whose answer is a ten-second ERROR must not be asked on a timer."
+msgstr "没有 SIM 卡的模组会用 ERROR 回答 AT+CPMS?；这是这里最常见的原因，而且不是守护进程的故障。设置会重试几次然后就不再多问，因为一个要花十秒才回 ERROR 的问题绝不该被定时器反复询问。"
+
+#: view/fm160/gnss.js
+msgid "A non-zero \"bad checksum\" is: it means the module sent a sentence that does not match its own checksum, and that one sentence was discarded while the rest of the block was kept."
+msgstr "而「校验和错误」非零则是问题：它表示模组发出的某条语句与其自身校验和不符，该语句被丢弃，块中其余内容保留。"
+
+#: view/fm160/sms.js
+msgid "A number and a message are both required."
+msgstr "号码和消息正文都必填。"
+
+#: view/fm160/usb.js
+msgid "A profile change is already in progress."
+msgstr "已经有一次配置切换在进行中。"
+
+#: view/fm160/usb.js
+msgid "A profile change left the module unreachable."
+msgstr "一次 USB 配置切换后模组失联了。"
+
+#: view/fm160/sms.js
+msgid "A sent message cannot be recalled."
+msgstr "已发送的消息无法撤回。"
+
+#: view/fm160/debug.js
+msgid "A text report of the state fm160d holds and the log lines it remembers, for a bug report. It reads only the daemon's cached state - it sends nothing to the modem, so asking for it cannot disturb what it is describing."
+msgstr "一份文本报告，包含 fm160d 持有的状态与它记住的日志行，用于提交故障报告。它只读取守护进程缓存的状态——不会向模组发送任何内容，因此索取它不会打扰它所描述的对象。"
+
+#: view/fm160/gnss.js
+msgid "AGPS is read-only in this version. It is displayed because it decides how long the receiver takes to get its first fix, and because a wrong server looks exactly like a weak signal from the outside."
+msgstr "本版本的 AGPS 是只读的。之所以显示，是因为它决定接收机拿到首次定位要花多久，也因为从外部看，服务器配错和信号弱的表现一模一样。"
+
+#: view/fm160/dial.js
+msgid "APN"
+msgstr "APN"
+
+#: view/fm160/dial.js
+msgid "APN is required."
+msgstr "必须填写 APN。"
+
+#: view/fm160/dial.js
+msgid "APN may only contain letters, digits, dot, dash and underscore."
+msgstr "APN 只能包含字母、数字、点、短横线和下划线。"
+
+#: menu.d
+msgid "AT Console"
+msgstr "AT 调试"
+
+#: fm160/api.js
+msgid "AT degraded - polling slowed down"
+msgstr "AT 降级——轮询已放慢"
+
+#: fm160/api.js
+msgid "AT healthy"
+msgstr "AT 正常"
+
+#: fm160/api.js
+msgid "AT port not found"
+msgstr "未找到 AT 口"
+
+#: fm160/api.js
+msgid "AT unresponsive - automatic polling stopped"
+msgstr "AT 无应答——已停止自动轮询"
+
+#: view/fm160/cells.js
+msgid "AT+GTCELLLOCK=? reports a mode value beyond the documented 0 and 1. It is recorded in the status blob as evidence and deliberately not usable here."
+msgstr "AT+GTCELLLOCK=? 报出的模式值超出了手册记载的 0 和 1。它已作为证据记入状态 blob，并有意不在此处提供。"
+
+#: view/fm160/gnss.js
+msgid "AT+GTGPS? answered ERROR. On this module that means the engine is off, not that the receiver is broken - switch it on above and read again."
+msgstr "AT+GTGPS? 回答了 ERROR。在本模组上这表示引擎关闭，而不是接收机坏了——请在上面打开它再读一次。"
+
+#: view/fm160/gnss.js
+msgid "AT+GTGPSCFG=? answered, but nothing in it matches a combination the FM160 manual documents. Writing is disabled rather than guessing what the numbers mean."
+msgstr "AT+GTGPSCFG=? 有应答，但其中没有任何一项与 FM160 手册记载的组合相符。与其猜测这些数字的含义，不如禁用写入。"
+
+#: view/fm160/gnss.js
+msgid "AT+GTGPSCFG=? has not been observed on this hardware, so the list may be narrower than the modem really allows."
+msgstr "在这套硬件上还没有观察到过 AT+GTGPSCFG=?，因此这个列表可能比模组实际允许的更窄。"
+
+#: view/fm160/gnss.js
+msgid "AT+GTGPSPOWER is the one GNSS setting this module does NOT store. It comes back off after every power cycle, so fm160d re-applies it whenever the module reappears."
+msgstr "AT+GTGPSPOWER 是本模组唯一不保存的 GNSS 设置。每次断电重启后它都会回到关闭状态，因此模组一重新出现 fm160d 就重新应用它。"
+
+#: view/fm160/sms.js
+msgid "Accepted by the modem."
+msgstr "模组已接受。"
+
+#: view/fm160/cells.js view/fm160/logs.js
+msgid "Action"
+msgstr "操作"
+
+#: view/fm160/overview.js
+msgid "Actions"
+msgstr "操作"
+
+#: view/fm160/usb.js
+msgid "Active profile"
+msgstr "当前配置"
+
+#: view/fm160/logs.js
+msgid "Actor"
+msgstr "操作方"
+
+#: view/fm160/gnss.js
+msgctxt "fm160 gnss field"
+msgid "Age"
+msgstr "年龄"
+
+#: view/fm160/gnss.js
+msgid "Age of the last block"
+msgstr "最后一个块的年龄"
+
+#: view/fm160/gnss.js
+msgid "Age of the last empty answer"
+msgstr "最后一次空应答的年龄"
+
+#: view/fm160/gnss.js
+msgid "Age of this reading"
+msgstr "本次读数的年龄"
+
+#: view/fm160/mwan.js
+msgid "All fm160-managed mwan3 interface and member sections are deleted and removed from every policy. Sections you wrote yourself are not touched. The interfaces themselves keep working - only the mwan3 side is unwound."
+msgstr "所有 fm160 托管的 mwan3 interface/member 配置段会被删除并从所有策略移除。你自己写的配置段不受影响。接口本身继续工作——只是撤掉 mwan3 侧。"
+
+#: view/fm160/sms.js
+msgid "Already held when seen again"
+msgstr "再次见到时已存在"
+
+#: view/fm160/usb.js
+msgid "Also show profiles that are not in the FM160 AT manual"
+msgstr "同时显示不在 FM160 AT 手册中的配置"
+
+#: view/fm160/gnss.js
+msgctxt "fm160 gnss field"
+msgid "Altitude"
+msgstr "海拔"
+
+#: view/fm160/cells.js
+msgid "An NR leg is present, so this is EN-DC. Only the first block is expanded into the table above."
+msgstr "存在 NR 分支，因此这是 EN-DC。只有第一个块被展开到上表中。"
+
+#: view/fm160/sms.js
+msgid "Another SMS operation is already running."
+msgstr "已有另一个短信操作在执行。"
+
+#: view/fm160/gnss.js
+msgid "Answer size"
+msgstr "应答大小"
+
+#: view/fm160/gnss.js
+msgid "Assisted GPS"
+msgstr "辅助 GPS"
+
+#: view/fm160/dial.js
+msgid "At least one of IPv4 / IPv6 must be enabled."
+msgstr "IPv4 / IPv6 至少启用一项。"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "Auto-capturing every 30 s while this page is open…"
+msgstr "本页打开期间每 30 秒自动抓取…"
+
+#: view/fm160/mwan.js
+msgid "Auto-register into mwan3"
+msgstr "自动注册到 mwan3"
+
+#: view/fm160/logs.js
+msgid "Autoscroll"
+msgstr "自动滚动"
+
+#: view/fm160/gnss.js
+msgid "Autostart is enabled in /etc/config/fm160, so it is switched back on automatically."
+msgstr "/etc/config/fm160 里启用了自动启动，因此它会自动重新打开。"
+
+#: view/fm160/gnss.js
+msgid "Autostart is off in /etc/config/fm160 (option gnss_autostart), so it stays off until it is switched on here."
+msgstr "/etc/config/fm160 里的自动启动是关闭的（选项 gnss_autostart），因此在手动打开之前它会一直关闭。"
+
+#: view/fm160/usb.js
+msgctxt "fm160 profile table heading"
+msgid "Available"
+msgstr "可选"
+
+#: view/fm160/cells.js
+msgid "Available locks are listed below, one row per cell the modem can currently see."
+msgstr "可用的锁定目标列在下面，模组当前能看到的每个小区占一行。"
+
+#: view/fm160/gnss.js
+msgid "Average SNR (best)"
+msgstr "平均 SNR（最佳）"
+
+#: view/fm160/gnss.js
+msgid "Azimuth"
+msgstr "方位角"
+
+#: view/fm160/gnss.js
+msgid "Bad checksum"
+msgstr "校验和错误"
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgctxt "fm160 band column"
+msgid "Band"
+msgstr "频段"
+
+#: view/fm160/cells.js
+msgid "Band lock"
+msgstr "锁频段"
+
+#: view/fm160/signal.js
+msgid "Band locking, cell locking and carrier aggregation live on the"
+msgstr "锁频段、锁小区与载波聚合在"
+
+#: view/fm160/cells.js view/fm160/overview.js
+msgid "Bandwidth"
+msgstr "带宽"
+
+#: fm160/api.js
+msgid "BeiDou"
+msgstr "北斗"
+
+#: view/fm160/gnss.js
+msgid "Best SNR"
+msgstr "最佳 SNR"
+
+#: view/fm160/signal.js
+msgid "CQI"
+msgstr "CQI"
+
+#: view/fm160/overview.js
+msgid "CQI %d, %s, DL MCS %d / UL MCS %d"
+msgstr "CQI %d，%s，DL MCS %d / UL MCS %d"
+
+#: view/fm160/overview.js
+msgid "CQI / RANK / MCS"
+msgstr "CQI / RANK / MCS"
+
+#: view/fm160/cells.js view/fm160/gnss.js view/fm160/mwan.js view/fm160/overview.js view/fm160/sms.js view/fm160/usb.js
+msgid "Cancel"
+msgstr "取消"
+
+#: view/fm160/cells.js view/fm160/overview.js
+msgid "Carrier aggregation"
+msgstr "载波聚合"
+
+#: view/fm160/cells.js
+msgid "Cell"
+msgstr "小区"
+
+#: view/fm160/overview.js view/fm160/signal.js
+msgctxt "fm160 cell field"
+msgid "Cell ID"
+msgstr "小区 ID"
+
+#: view/fm160/cells.js
+msgid "Cell lock"
+msgstr "锁小区"
+
+#: view/fm160/cells.js
+msgid "Cell lock is off."
+msgstr "锁小区已关闭。"
+
+#: view/fm160/cells.js
+msgid "Cell lock state has not been read yet."
+msgstr "锁小区状态尚未读取。"
+
+#: view/fm160/cells.js
+msgid "Cell scan (live AT)"
+msgstr "小区扫描（实时 AT）"
+
+#: menu.d
+msgid "Cells and Locking"
+msgstr "小区与锁频"
+
+#: view/fm160/cells.js
+msgid "Cells available for locking"
+msgstr "可锁定的小区"
+
+#: view/fm160/gnss.js
+msgid "Change to"
+msgstr "切换到"
+
+#: view/fm160/mwan.js
+msgid "Check interval (s)"
+msgstr "检测间隔（秒）"
+
+#: view/fm160/dial.js
+msgid "Check interval (seconds)"
+msgstr "检查间隔（秒）"
+
+#: view/fm160/dial.js
+msgid "Check interval must be 10-600 seconds."
+msgstr "检查间隔必须在 10-600 秒之间。"
+
+#: view/fm160/mwan.js
+msgid "Class"
+msgstr "类别"
+
+#: view/fm160/logs.js
+msgid "Clear log"
+msgstr "清空日志"
+
+#: view/fm160/cells.js
+msgid "Clear selection"
+msgstr "清空选择"
+
+#: view/fm160/sms.js
+msgid "Close"
+msgstr "关闭"
+
+#: view/fm160/debug.js
+msgid "Command"
+msgstr "命令"
+
+#: view/fm160/debug.js
+msgid "Commands are sent raw; fm160d appends the carriage return and waits for OK / ERROR / +CME ERROR. Most commands time out after 5 s; the ones that are known to be slow on real hardware get up to 20 s."
+msgstr "命令按原样发送；fm160d 会追加回车，并等待 OK / ERROR / +CME ERROR。大多数命令的超时是 5 秒，真机上已知较慢的那些放宽到 20 秒。"
+
+#: view/fm160/debug.js
+msgid "Common queries"
+msgstr "常用查询"
+
+#: view/fm160/gnss.js
+msgid "Configuration"
+msgstr "配置"
+
+#: view/fm160/dial.js
+msgid "Connect"
+msgstr "连接"
+
+#: view/fm160/dial.js
+msgid "Connect (switches USB profile first)"
+msgstr "连接（必要时先切换 USB 配置）"
+
+#: view/fm160/dial.js
+msgid "Connect automatically at boot"
+msgstr "开机自动连接"
+
+#: view/fm160/dial.js
+msgid "Connecting..."
+msgstr "正在连接…"
+
+#: view/fm160/dial.js
+msgid "Connection"
+msgstr "连接"
+
+#: view/fm160/gnss.js
+msgid "Constellation"
+msgstr "星座"
+
+#: view/fm160/gnss.js
+msgid "Constellations"
+msgstr "星座"
+
+#: view/fm160/usb.js
+msgid "Continue"
+msgstr "继续"
+
+#: view/fm160/debug.js
+msgid "Could not build the diagnostics report"
+msgstr "无法生成诊断报告"
+
+#: view/fm160/logs.js
+msgid "Could not clear the log"
+msgstr "无法清空日志"
+
+#: view/fm160/sms.js
+msgid "Could not mark it read"
+msgstr "无法标记为已读"
+
+#: view/fm160/logs.js
+msgid "Could not read the log"
+msgstr "无法读取日志"
+
+#: view/fm160/logs.js
+msgid "Could not read the log:"
+msgstr "Could not read the log:"
+
+#: view/fm160/sms.js
+msgid "Could not read the message list"
+msgstr "无法读取消息列表"
+
+#: view/fm160/sms.js
+msgid "Could not start the refresh."
+msgstr "无法启动刷新。"
+
+#: view/fm160/gnss.js
+msgid "Course"
+msgstr "航向"
+
+#: view/fm160/cells.js
+msgid "Current band restriction"
+msgstr "当前频段限制"
+
+#: view/fm160/overview.js
+msgid "DL %sx %s / UL %sx %s"
+msgstr "DL %sx %s / UL %sx %s"
+
+#: view/fm160/cells.js
+msgid "DL MIMO"
+msgstr "下行 MIMO"
+
+#: view/fm160/cells.js
+msgid "DL modulation"
+msgstr "下行调制"
+
+#: view/fm160/cells.js
+msgid "DL width"
+msgstr "下行带宽"
+
+#: view/fm160/gnss.js
+msgid "Date"
+msgstr "日期"
+
+#: view/fm160/dial.js
+msgid "Delegate IPv6 /64 to LAN"
+msgstr "向 LAN 下发 IPv6 /64"
+
+#: view/fm160/sms.js
+msgid "Delete"
+msgstr "删除"
+
+#: view/fm160/sms.js
+msgid "Delete failed"
+msgstr "删除失败"
+
+#: view/fm160/sms.js
+msgid "Delete this message?"
+msgstr "删除这条消息？"
+
+#: view/fm160/logs.js
+msgid "Detail"
+msgstr "详情"
+
+#: view/fm160/mwan.js
+msgid "Device"
+msgstr "设备"
+
+#: view/fm160/debug.js view/fm160/gnss.js view/fm160/sms.js
+msgctxt "fm160 diagnostics heading"
+msgid "Diagnostics"
+msgstr "诊断"
+
+#: menu.d
+msgid "Dial"
+msgstr "拨号"
+
+#: view/fm160/dial.js
+msgid "Dial command sent. The link comes up over the next seconds; a mode switch can take a minute."
+msgstr "拨号命令已发送。链路将在随后几秒内建立；模式切换可能需要一分钟。"
+
+#: view/fm160/dial.js
+msgid "Dial mode"
+msgstr "拨号模式"
+
+#: view/fm160/dial.js
+msgid "Dial settings"
+msgstr "拨号设置"
+
+#: view/fm160/usb.js
+msgid "Dialled by"
+msgstr "由谁拨号"
+
+#: view/fm160/sms.js
+msgid "Direction"
+msgstr "方向"
+
+#: view/fm160/cells.js
+msgid "Disable cell lock"
+msgstr "关闭锁小区"
+
+#: view/fm160/cells.js
+msgid "Disable cell lock?"
+msgstr "关闭锁小区？"
+
+#: view/fm160/dial.js
+msgid "Disconnect"
+msgstr "断开连接"
+
+#: view/fm160/mwan.js
+msgid "Discovered interfaces"
+msgstr "已发现的接口"
+
+#: view/fm160/overview.js
+msgctxt "fm160 traffic direction"
+msgid "Down"
+msgstr "下行"
+
+#: view/fm160/debug.js
+msgid "Download as a file"
+msgstr "下载为文件"
+
+#: view/fm160/overview.js
+msgid "EARFCN"
+msgstr "EARFCN"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "EARFCN / NRARFN"
+msgstr "EARFCN / NRARFN"
+
+#: view/fm160/dial.js
+msgid "ECM (native)"
+msgstr "ECM（原生）"
+
+#: view/fm160/gnss.js
+msgid "EPO"
+msgstr "EPO"
+
+#: view/fm160/gnss.js
+msgid "Elevation"
+msgstr "仰角"
+
+#: view/fm160/gnss.js
+msgid "Empty answers in a row"
+msgstr "连续空应答"
+
+#: view/fm160/sms.js
+msgid "Empty."
+msgstr "空。"
+
+#: view/fm160/dial.js
+msgid "Enable keepalive"
+msgstr "启用保活"
+
+#: view/fm160/gnss.js
+msgid "Engine:"
+msgstr "引擎："
+
+#: view/fm160/debug.js
+msgid "Enter a command first."
+msgstr "请先输入一条命令。"
+
+#: view/fm160/logs.js
+msgid "Every action this plugin performs on the modem - dials, redials, module reloads, band and cell-lock changes, USB mode switches, SMS sends, keepalive verdicts - is appended here with its outcome. The log lives in /var/log/fm160-ops.log and keeps the most recent 300 entries."
+msgstr "本插件对模组的每一项操作——拨号、重拨、模块重载、频段与锁小区变更、USB 模式切换、短信发送、保活判定——都会连同结果追加到这里。日志位于 /var/log/fm160-ops.log，保留最近 300 条。"
+
+#: view/fm160/usb.js
+msgid "Every connection through it drops. The modem leaves the USB bus and comes back as a different device, so it is unreachable for roughly 30-90 s - including from this page."
+msgstr "经过它的所有连接都会中断。模组会离开 USB 总线、再以另一个设备回来，期间约 30–90 秒不可达——包括本页面。"
+
+#: view/fm160/dial.js
+msgid "Every interval the module-reported DNS is pinged over the carrier path (IPv4/IPv6 honouring the stack toggles)."
+msgstr "每个间隔通过承载网 ping 模组上报的 DNS（按 v4/v6 开关选择族）。"
+
+#: menu.d
+msgid "FM160"
+msgstr "FM160"
+
+#: view/fm160/dial.js
+msgid "Failed rounds"
+msgstr "失败轮次"
+
+#: view/fm160/mwan.js
+msgid "Failure check interval (s)"
+msgstr "故障检测间隔（秒）"
+
+#: view/fm160/mwan.js
+msgctxt "fm160 mwan3 table"
+msgid "Family"
+msgstr "协议族"
+
+#: view/fm160/debug.js
+msgid "Fetch and show"
+msgstr "获取并显示"
+
+#: view/fm160/overview.js
+msgid "Firmware"
+msgstr "固件"
+
+#: view/fm160/gnss.js
+msgid "Fix type"
+msgstr "定位类型"
+
+#: view/fm160/sms.js
+msgid "Format"
+msgstr "格式"
+
+#: view/fm160/cells.js
+msgid "Frequency"
+msgstr "频率"
+
+#: menu.d
+msgid "GNSS"
+msgstr "GNSS"
+
+#: fm160/api.js
+msgid "GNSS config change"
+msgstr "GNSS 配置变更"
+
+#: view/fm160/gnss.js
+msgid "GNSS engine"
+msgstr "GNSS 引擎"
+
+#: fm160/api.js
+msgid "GNSS power off"
+msgstr "GNSS 电源关闭"
+
+#: fm160/api.js
+msgid "GNSS power on"
+msgstr "GNSS 电源打开"
+
+#: view/fm160/gnss.js
+msgid "Geoid separation"
+msgstr "大地水准面差距"
+
+#: view/fm160/dial.js
+msgid "Give up after N rounds within 24 h"
+msgstr "24 小时内 N 轮后放弃"
+
+#: view/fm160/dial.js
+msgid "Give-up threshold must be 2-100 rounds."
+msgstr "放弃阈值必须在 2-100 轮之间。"
+
+#: view/fm160/overview.js
+msgid "ICCID"
+msgstr "ICCID"
+
+#: view/fm160/overview.js
+msgid "IMEI"
+msgstr "IMEI"
+
+#: view/fm160/dial.js
+msgid "IPv4"
+msgstr "IPv4"
+
+#: view/fm160/dial.js
+msgid "IPv4 address"
+msgstr "IPv4 地址"
+
+#: view/fm160/dial.js
+msgid "IPv4 ping target may only contain digits and dots (or empty)."
+msgstr "IPv4 目标只能包含数字和点（或留空）。"
+
+#: view/fm160/dial.js
+msgid "IPv4/IPv6 map to the PDP type on ECM (-4 -6 = IPV4V6) and to -4/-6 flags on QMAP / ip-type on MBIM."
+msgstr "IPv4/IPv6 在 ECM 上映射为 PDP 类型（-4 -6 = IPV4V6），在 QMAP 上映射为 -4/-6 标志，在 MBIM 上映射为 ip-type。"
+
+#: view/fm160/dial.js
+msgid "IPv6"
+msgstr "IPv6"
+
+#: view/fm160/dial.js
+msgid "IPv6 address"
+msgstr "IPv6 地址"
+
+#: view/fm160/dial.js
+msgid "IPv6 ping target must be an IPv6 address (or empty)."
+msgstr "IPv6 目标必须是 IPv6 地址（或留空）。"
+
+#: view/fm160/usb.js
+msgid "If it does not come back in the new profile, fm160d rolls back to"
+msgstr "如果它没有以新配置回来，fm160d 会回滚到"
+
+#: view/fm160/usb.js
+msgid "If that fails too, the module needs a manual power cycle. Nothing on this page can recover it."
+msgstr "如果那也失败，模组需要手动断电重启。本页面上的任何操作都无法恢复它。"
+
+#: view/fm160/dial.js
+msgid "In Network -> Interfaces"
+msgstr "在 网络 → 接口 中"
+
+#: view/fm160/gnss.js
+msgid "In fix"
+msgstr "参与定位"
+
+#: view/fm160/gnss.js
+msgid "In view (reported)"
+msgstr "可见（模组报告）"
+
+#: view/fm160/mwan.js view/fm160/overview.js
+msgid "Interface"
+msgstr "接口"
+
+#: view/fm160/usb.js
+msgid "Interfaces"
+msgstr "接口"
+
+#: view/fm160/debug.js
+msgid "It contains the modem's IMEI, serial number and the SIM's ICCID. Remove them before posting it publicly."
+msgstr "其中包含模组的 IMEI、序列号以及 SIM 的 ICCID。公开发布前请先删除它们。"
+
+#: view/fm160/usb.js
+msgid "It has not answered since the switch, so fm160d is not trying again and will refuse further profile changes. The module needs a manual power cycle; nothing on this page can recover it."
+msgstr "切换之后它一直没有应答，因此 fm160d 不再重试，并会拒绝后续的配置切换。模组需要手动断电重启；本页面上没有任何操作能恢复它。"
+
+#: view/fm160/usb.js
+msgid "It re-enumerates on the USB bus, which takes 30-90 s, and the AT port is absent until it finishes."
+msgstr "，并在 USB 总线上重新枚举（约 30–90 秒）。枚举完成前 AT 口不存在。"
+
+#: view/fm160/dial.js
+msgid "Keepalive"
+msgstr "保活"
+
+#: view/fm160/dial.js
+msgid "Keepalive (link watchdog)"
+msgstr "保活（链路看门狗）"
+
+#: view/fm160/sms.js
+msgid "Kept in this daemon"
+msgstr "本守护进程保存的"
+
+#: view/fm160/overview.js
+msgid "LTE registration"
+msgstr "LTE 注网"
+
+#: view/fm160/sms.js
+msgid "Last +CMS ERROR"
+msgstr "最近的 +CMS ERROR"
+
+#: view/fm160/gnss.js
+msgid "Last NMEA block"
+msgstr "最近的 NMEA 块"
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgid "Last capture:"
+msgstr "最近抓取："
+
+#: view/fm160/dial.js
+msgid "Last check"
+msgstr "最近检查"
+
+#: view/fm160/sms.js
+msgid "Last error text"
+msgstr "最近的错误文本"
+
+#: view/fm160/sms.js
+msgid "Last send command"
+msgstr "最近一次发送命令"
+
+#: view/fm160/overview.js
+msgid "Last successful AT"
+msgstr "最近一次成功的 AT"
+
+#: view/fm160/sms.js
+msgid "Last successful operation"
+msgstr "最近一次成功的操作"
+
+#: view/fm160/gnss.js
+msgid "Latitude"
+msgstr "纬度"
+
+#: view/fm160/cells.js
+msgid "Like the lock itself, the change is stored immediately but only takes effect after a UE reset."
+msgstr "与锁定本身一样，改动会立即保存，但只在 UE 复位后才生效。"
+
+#: view/fm160/dial.js
+msgid "Link"
+msgstr "链路"
+
+#: view/fm160/signal.js
+msgid "Link adaptation (AT+GTCELLINFO)"
+msgstr "链路自适应（AT+GTCELLINFO）"
+
+#: view/fm160/mwan.js
+msgid "Live \"mwan3 interfaces\" output appears here after Sync now."
+msgstr "按「立即同步」后此处显示 mwan3 interfaces 实时输出。"
+
+#: view/fm160/signal.js
+msgid "Live AT+GTCCINFO? neighbour list and AT+GTCAINFO? carrier aggregation, captured automatically; press the button for an immediate pass."
+msgstr "实时下发 AT+GTCCINFO?（邻区列表）与 AT+GTCAINFO?（载波聚合），自动抓取；按按钮立即抓取一轮。"
+
+#: view/fm160/mwan.js
+msgid "Live state"
+msgstr "实时状态"
+
+#: view/fm160/logs.js
+msgid "Loading…"
+msgstr "加载中…"
+
+#: view/fm160/cells.js
+msgid "Lock"
+msgstr "锁定"
+
+#: view/fm160/cells.js
+msgid "Lock on"
+msgstr "锁定于"
+
+#: view/fm160/cells.js
+msgid "Lock to %s"
+msgstr "锁定到 %s"
+
+#: view/fm160/cells.js
+msgid "Lock to %s?"
+msgstr "锁定到 %s？"
+
+#: view/fm160/cells.js
+msgid "Lock to the selected bands"
+msgstr "锁定到所选频段"
+
+#: view/fm160/cells.js
+msgid "Lock to the selected bands?"
+msgstr "锁定到所选频段？"
+
+#: view/fm160/cells.js
+msgid "Locking is disabled until the modem answers AT+GTACT=?."
+msgstr "在模组回答 AT+GTACT=? 之前，锁定是禁用的。"
+
+#: view/fm160/cells.js
+msgid "Locking pins the modem to one cell. It is stored in the modem and only takes effect after a UE reset. Use the band lock instead when the goal is simply to stop the modem from using a particular band."
+msgstr "锁小区会把模组钉在一个小区上。它保存在模组里，且只在 UE 复位后才生效。如果目的只是不让模组使用某个频段，请改用锁频段。"
+
+#: view/fm160/gnss.js
+msgid "Longitude"
+msgstr "经度"
+
+#: view/fm160/mwan.js
+msgid "Lower metric wins failover; equal metrics balance by weight."
+msgstr "metric 越小优先级越高（故障切换）；metric 相同的接口按权重分享流量。"
+
+#: view/fm160/dial.js
+msgid "MBIM (standard)"
+msgstr "MBIM（标准）"
+
+#: view/fm160/signal.js
+msgid "MCS DL / UL"
+msgstr "MCS DL / UL"
+
+#: view/fm160/overview.js
+msgid "MIMO / modulation"
+msgstr "MIMO / 调制"
+
+#: menu.d
+msgid "MWAN3"
+msgstr "MWAN3 均衡"
+
+#: view/fm160/mwan.js
+msgid "MWAN3 integration"
+msgstr "MWAN3 integration"
+
+#: view/fm160/gnss.js
+msgid "Malformed"
+msgstr "格式错误"
+
+#: view/fm160/overview.js
+msgid "Management is paused. No polling is running."
+msgstr "管理已暂停，没有轮询在跑。"
+
+#: view/fm160/cells.js
+msgid "Manual entry. The modem accepts %s and %s for the mode; its own capability answer lists a third value that the manual does not define, and this page will not write it."
+msgstr "手动输入。模组对模式只接受 %s 和 %s；它自己的能力应答里还列了第三个值，而手册没有定义，本页面不会写入它。"
+
+#: view/fm160/overview.js
+msgctxt "fm160 identity field"
+msgid "Manufacturer"
+msgstr "厂商"
+
+#: view/fm160/sms.js
+msgid "Mark read"
+msgstr "标记已读"
+
+#: view/fm160/sms.js
+msgid "Message"
+msgstr "消息"
+
+#: view/fm160/sms.js
+msgid "Message mode"
+msgstr "消息模式"
+
+#: view/fm160/sms.js
+msgid "Message mode is PDU, storage %s is in use, and new-message indications are armed."
+msgstr "消息模式为 PDU，正在使用存储 %s，新消息提示已就绪。"
+
+#: view/fm160/sms.js
+msgid "Message text"
+msgstr "消息正文"
+
+#: view/fm160/sms.js
+msgid "Messages"
+msgstr "消息"
+
+#: view/fm160/sms.js
+msgid "Messages on the modem"
+msgstr "模组上的消息"
+
+#: view/fm160/sms.js
+msgid "Messages the modem still holds will not come back on the next refresh, but a message kept only here is gone for good."
+msgstr "模组仍持有的消息不会在下次刷新时回来，而只保存在这里的消息则会永久消失。"
+
+#: view/fm160/mwan.js
+msgid "Mobile priority (metric)"
+msgstr "移动优先级（metric）"
+
+#: view/fm160/mwan.js
+msgid "Mobile weight"
+msgstr "移动权重"
+
+#: view/fm160/usb.js
+msgid "Mode"
+msgstr "模式"
+
+#: view/fm160/overview.js
+msgid "Model"
+msgstr "型号"
+
+#: menu.d
+msgid "Modem Overview"
+msgstr "模组概览"
+
+#: view/fm160/overview.js
+msgid "Module"
+msgstr "模组"
+
+#: view/fm160/dial.js
+msgid "Module profile"
+msgstr "模块配置"
+
+#: view/fm160/overview.js
+msgid "Module rate (AT+GTSTATIS)"
+msgstr "模块速率（AT+GTSTATIS）"
+
+#: view/fm160/dial.js
+msgid "Module reload threshold must be 2-50 rounds."
+msgstr "模块重载阈值必须在 2-50 轮之间。"
+
+#: view/fm160/dial.js
+msgid "Module reloads"
+msgstr "模块重载"
+
+#: view/fm160/sms.js
+msgid "Multi-segment sends accepted"
+msgstr "被接受的多段发送"
+
+#: view/fm160/sms.js
+msgid "Multi-segment sends that timed out"
+msgstr "超时的多段发送"
+
+#: view/fm160/gnss.js
+msgid "NMEA bytes"
+msgstr "NMEA 字节数"
+
+#: view/fm160/cells.js
+msgid "NR band"
+msgstr "NR 频段"
+
+#: view/fm160/overview.js
+msgid "NR registration"
+msgstr "NR 注网"
+
+#: view/fm160/cells.js
+msgid "Neighbour"
+msgstr "邻区"
+
+#: view/fm160/signal.js
+msgid "Neighbour cells"
+msgstr "邻区"
+
+#: view/fm160/signal.js
+msgid "Neighbour cells (live AT)"
+msgstr "邻区（实时 AT）"
+
+#: view/fm160/overview.js
+msgid "Network"
+msgstr "网络"
+
+#: view/fm160/sms.js
+msgid "New message"
+msgstr "新消息"
+
+#: view/fm160/usb.js
+msgid "No AT port. The modem is either absent, or has not finished re-enumerating after a profile change."
+msgstr "没有 AT 口。要么模组不在，要么切换配置后尚未完成重新枚举。"
+
+#: view/fm160/cells.js
+msgid "No band data yet. It is polled in the background, so give it a few seconds."
+msgstr "还没有频段数据。它在后台轮询，请等几秒。"
+
+#: view/fm160/cells.js
+msgid "No band restriction: automatic band selection is active."
+msgstr "没有频段限制：自动选频处于启用状态。"
+
+#: view/fm160/signal.js
+msgid "No cell information yet. Cell data is only polled while this page is open - give it a few seconds."
+msgstr "还没有小区信息。只有本页打开时才会轮询小区数据——请等几秒。"
+
+#: view/fm160/cells.js
+msgid "No cell with a frequency has been measured yet. Cell information is only polled while a signal page is open - open the signal page, or wait for the next poll on this one."
+msgstr "还没有测到带频率的小区。只有信号页打开时才会轮询小区信息——请打开信号页，或等本页的下一次轮询。"
+
+#: view/fm160/gnss.js
+msgid "No constellation has been heard from yet."
+msgstr "还没有收到任何星座。"
+
+#: view/fm160/mwan.js
+msgid "No fm160-managed mwan3 sections yet."
+msgstr "尚无 fm160 托管的 mwan3 配置段。"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "No neighbour cells reported this capture."
+msgstr "本次抓取未上报邻区。"
+
+#: view/fm160/usb.js
+msgid "No profile may be chosen right now."
+msgstr "当前没有可选的配置。"
+
+#: view/fm160/overview.js
+msgid "No radio capture yet - press Refresh to take one."
+msgstr "尚无无线抓取——按\"刷新\"抓取一轮。"
+
+#: view/fm160/cells.js
+msgid "No scan result yet."
+msgstr "No scan result yet."
+
+#: view/fm160/usb.js
+msgid "Not offered"
+msgstr "不可选"
+
+#: view/fm160/usb.js
+msgctxt "fm160 usb notes heading"
+msgid "Notes"
+msgstr "说明"
+
+#: view/fm160/mwan.js
+msgid "Nothing discovered yet. Auto-registration is off, or no WAN-side interface exists."
+msgstr "尚无可发现接口。自动注册关闭，或不存在 WAN 侧接口。"
+
+#: view/fm160/sms.js
+msgid "Nothing is sent until you confirm."
+msgstr "在你确认之前不会发送任何内容。"
+
+#: view/fm160/sms.js
+msgid "Nothing stored. Messages the modem holds appear here after a refresh; new ones arrive on their own as the modem announces them."
+msgstr "没有已保存的内容。模组持有的消息会在刷新后出现在这里；新消息会在模组通告时自动到来。"
+
+#: view/fm160/sms.js
+msgctxt "fm160 sms field"
+msgid "Number"
+msgstr "号码"
+
+#: view/fm160/cells.js
+msgid "Only bands this modem reports are listed. That is deliberate: AT+GTACT writes the raw token, and a token the modem did not advertise is a guess. LTE and NR token numbers are not band numbers - the raw value is shown as a tooltip."
+msgstr "只列出本模组报告过的频段。这是有意为之：AT+GTACT 写入的是原始 token，而模组没有公布过的 token 就是猜测。LTE 与 NR 的 token 编号不是频段号——原始值以提示形式显示。"
+
+#: view/fm160/gnss.js
+msgid "Only combinations that are both documented by the manual and reported by this modem are offered. The setting survives a power cycle."
+msgstr "只提供既有手册记载、又由本模组报告过的组合。该设置在断电重启后仍然保留。"
+
+#: view/fm160/sms.js
+msgid "Operation in flight"
+msgstr "进行中的操作"
+
+#: menu.d
+msgid "Operations Log"
+msgstr "操作日志"
+
+#: view/fm160/logs.js
+msgid "Operations log"
+msgstr "操作日志"
+
+#: view/fm160/overview.js
+msgid "Operator"
+msgstr "运营商"
+
+#: view/fm160/overview.js
+msgid "Operator (AT+COPS)"
+msgstr "运营商（AT+COPS）"
+
+#: view/fm160/overview.js
+msgid "PCC band"
+msgstr "PCC 频段"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "PCC:"
+msgstr "PCC："
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgid "PCI"
+msgstr "PCI"
+
+#: view/fm160/sms.js
+msgid "PDU length (hex digits)"
+msgstr "PDU 长度（十六进制位数）"
+
+#: view/fm160/overview.js view/fm160/signal.js
+msgid "PLMN"
+msgstr "PLMN"
+
+#: view/fm160/gnss.js
+msgid "Parsed"
+msgstr "已解析"
+
+#: view/fm160/sms.js
+msgid "Part"
+msgstr "分段"
+
+#: view/fm160/overview.js
+msgid "Pause"
+msgstr "暂停"
+
+#: view/fm160/overview.js
+msgid "Pause FM160 management"
+msgstr "暂停 FM160 管理"
+
+#: view/fm160/overview.js
+msgid "Pause management"
+msgstr "暂停管理"
+
+#: view/fm160/mwan.js
+msgid "Ping count per round"
+msgstr "每轮 ping 次数"
+
+#: view/fm160/dial.js
+msgid "Ping target IPv4 (empty = module DNS)"
+msgstr "IPv4 探测目标（留空 = 模组 DNS）"
+
+#: view/fm160/dial.js
+msgid "Ping target IPv6 (empty = module DNS)"
+msgstr "IPv6 探测目标（留空 = 模组 DNS）"
+
+#: view/fm160/mwan.js
+msgid "Ping timeout (s)"
+msgstr "ping 超时（秒）"
+
+#: view/fm160/overview.js
+msgid "Polling is tiered: registration every 5 s while a page is open, cells every 10 s, and byte counters are read from sysfs so they cost no AT commands at all."
+msgstr "轮询是分级的：页面打开时每 5 秒查一次注网，每 10 秒查一次小区，而字节计数器直接读 sysfs，完全不消耗 AT 命令。"
+
+#: view/fm160/gnss.js
+msgid "Position"
+msgstr "位置"
+
+#: view/fm160/usb.js
+msgid "Profile list"
+msgstr "配置清单"
+
+#: view/fm160/usb.js
+msgid "Profiles that would leave no AT interface at all, or whose AT interface the kernel has no driver for, are listed as refused and cannot be chosen - the FM160 has no reset-to-default that the host can trigger, so that would be a one-way trip."
+msgstr "会完全失去 AT 接口的配置，或内核没有对应驱动的 AT 接口，都列在拒绝项里、无法选择——FM160 没有主机可触发的恢复默认配置，那会是一条单程路。"
+
+#: view/fm160/sms.js
+msgid "Pulled from the modem"
+msgstr "从模组拉取"
+
+#: view/fm160/overview.js
+msgid "QCI"
+msgstr "QCI"
+
+#: view/fm160/signal.js
+msgid "QCI TX / RX"
+msgstr "QCI TX / RX"
+
+#: view/fm160/dial.js
+msgid "QMAP (vendor)"
+msgstr "QMAP（厂商）"
+
+#: view/fm160/dial.js
+msgid "QMAP channels"
+msgstr "QMAP 通道"
+
+#: view/fm160/usb.js
+msgid "QMI and MBIM links are brought up by the kernel stack through netifd - use the network configuration for that, and leave the button below alone."
+msgstr "QMI 与 MBIM 链路由内核协议栈经 netifd 建立——请到网络配置里操作，不要用下面的按钮。"
+
+#: view/fm160/gnss.js
+msgid "Quality"
+msgstr "质量"
+
+#: view/fm160/overview.js
+msgid "Queued AT"
+msgstr "排队的 AT"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "RAT"
+msgstr "RAT"
+
+#: view/fm160/cells.js
+msgid "RAT preference: %s (fallback %s, then %s)"
+msgstr "RAT 偏好：%s（回退 %s，再 %s）"
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgid "RSRP"
+msgstr "RSRP"
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgid "RSRQ"
+msgstr "RSRQ"
+
+#: view/fm160/overview.js
+msgid "RSSI (AT+CSQ)"
+msgstr "RSSI（AT+CSQ）"
+
+#: fm160/api.js
+msgid "RTK fixed"
+msgstr "RTK 固定解"
+
+#: fm160/api.js
+msgid "RTK float"
+msgstr "RTK 浮点解"
+
+#: view/fm160/dial.js
+msgid "RX %s / TX %s"
+msgstr "RX %s / TX %s"
+
+#: view/fm160/overview.js
+msgid "Radio (AT cross-check)"
+msgstr "无线（AT 交叉验证）"
+
+#: view/fm160/signal.js
+msgid "Rank"
+msgstr "Rank"
+
+#: view/fm160/overview.js
+msgid "Re-probe"
+msgstr "重新探测"
+
+#: view/fm160/overview.js
+msgid "Re-probe AT port"
+msgstr "重新探测 AT 口"
+
+#: view/fm160/overview.js
+msgid "Re-probe the AT port"
+msgstr "重新探测 AT 口"
+
+#: view/fm160/overview.js
+msgid "Re-read module identity"
+msgstr "重新读取模组身份"
+
+#: view/fm160/usb.js
+msgid "Reading the profile list..."
+msgstr "正在读取配置清单…"
+
+#: view/fm160/sms.js
+msgid "Reading..."
+msgstr "读取中…"
+
+#: view/fm160/overview.js view/fm160/sms.js
+msgid "Received"
+msgstr "已接收"
+
+#: view/fm160/logs.js view/fm160/overview.js
+msgid "Refresh"
+msgstr "刷新"
+
+#: view/fm160/sms.js
+msgid "Refresh failed"
+msgstr "刷新失败"
+
+#: view/fm160/sms.js
+msgid "Refresh from modem"
+msgstr "从模组刷新"
+
+#: view/fm160/sms.js
+msgid "Refreshing asks the modem to list everything it holds (AT+CMGL=4). It is a button and not a timer because that command takes seconds when the modem has no card. Loading the list reads the daemon's memory and costs nothing."
+msgstr "刷新会让模组列出它保存的全部消息（AT+CMGL=4）。它是一个按钮而不是定时器，因为模组没有卡时该命令要花好几秒。加载列表只读守护进程的内存，不产生任何开销。"
+
+#: view/fm160/usb.js
+msgid "Refused for now: no AT port, or the modem has not been asked which profile it is in."
+msgstr "暂时拒绝：没有 AT 口，或者还没问过模组处在哪个配置。"
+
+#: view/fm160/dial.js
+msgid "Registered"
+msgstr "已注册"
+
+#: view/fm160/mwan.js
+msgid "Registered in mwan3: %s"
+msgstr "已注册进 mwan3：%s"
+
+#: view/fm160/mwan.js
+msgid "Registration removed."
+msgstr "注册已移除。"
+
+#: view/fm160/sms.js
+msgid "Reload list"
+msgstr "重新加载列表"
+
+#: view/fm160/dial.js
+msgid "Reload module after N consecutive failed rounds"
+msgstr "连续 N 轮失败后重载模块"
+
+#: view/fm160/cells.js
+msgid "Remove band restriction"
+msgstr "解除频段限制"
+
+#: view/fm160/mwan.js
+msgid "Remove mwan3 registration?"
+msgstr "移除 mwan3 注册？"
+
+#: view/fm160/mwan.js
+msgid "Remove registration"
+msgstr "移除注册"
+
+#: view/fm160/cells.js
+msgid "Remove the band restriction?"
+msgstr "解除频段限制？"
+
+#: view/fm160/sms.js
+msgid "Removed from the modem and from this list."
+msgstr "已从模组和本列表中删除。"
+
+#: view/fm160/sms.js
+msgid "Removed from this list, but the modem refused to delete its own copy"
+msgstr "已从本列表删除，但模组拒绝删除它自己的副本"
+
+#: view/fm160/sms.js
+msgid "Removed from this list; the modem had no copy."
+msgstr "已从本列表删除；模组没有副本。"
+
+#: view/fm160/debug.js
+msgid "Response"
+msgstr "应答"
+
+#: view/fm160/usb.js
+msgid "Restart the module in profile"
+msgstr "以配置"
+
+#: view/fm160/cells.js
+msgid "Restore automatic band selection"
+msgstr "恢复自动选频"
+
+#: view/fm160/logs.js
+msgid "Result"
+msgstr "结果"
+
+#: view/fm160/overview.js
+msgid "Resume management"
+msgstr "恢复管理"
+
+#: view/fm160/usb.js
+msgid "Rollback point"
+msgstr "回滚点"
+
+#: view/fm160/mwan.js
+msgid "Rounds to declare down"
+msgstr "判为掉线的轮数"
+
+#: view/fm160/mwan.js
+msgid "Rounds to declare up"
+msgstr "判为恢复的轮数"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "SCC"
+msgstr "SCC"
+
+#: view/fm160/overview.js
+msgid "SIM status"
+msgstr "SIM 状态"
+
+#: menu.d view/fm160/sms.js
+msgid "SMS"
+msgstr "短信"
+
+#: fm160/api.js
+msgid "SMS delete"
+msgstr "短信删除"
+
+#: fm160/api.js
+msgid "SMS mark read"
+msgstr "短信标记已读"
+
+#: fm160/api.js
+msgid "SMS send"
+msgstr "短信发送"
+
+#: fm160/api.js
+msgid "SMS sync"
+msgstr "短信同步"
+
+#: view/fm160/overview.js
+msgid "SS-RSRP (AT+CSQ)"
+msgstr "SS-RSRP（AT+CSQ）"
+
+#: view/fm160/gnss.js
+msgid "SUPL certificate"
+msgstr "SUPL 证书"
+
+#: view/fm160/gnss.js
+msgid "SUPL port"
+msgstr "SUPL 端口"
+
+#: view/fm160/gnss.js
+msgid "SUPL server"
+msgstr "SUPL 服务器"
+
+#: view/fm160/gnss.js
+msgid "SUPL version"
+msgstr "SUPL 版本"
+
+#: view/fm160/gnss.js
+msgid "Satellite combination"
+msgstr "卫星组合"
+
+#: view/fm160/gnss.js
+msgid "Satellites"
+msgstr "卫星"
+
+#: view/fm160/gnss.js
+msgid "Satellites in use (GGA)"
+msgstr "在用卫星（GGA）"
+
+#: view/fm160/gnss.js
+msgid "Satellites in view"
+msgstr "可见卫星"
+
+#: view/fm160/gnss.js
+msgid "Satellites used in fix"
+msgstr "参与定位的卫星"
+
+#: view/fm160/mwan.js
+msgid "Save and sync"
+msgstr "保存并同步"
+
+#: view/fm160/mwan.js
+msgid "Save failed"
+msgstr "保存失败"
+
+#: view/fm160/dial.js
+msgid "Save settings"
+msgstr "保存设置"
+
+#: view/fm160/mwan.js
+msgid "Saved and synced."
+msgstr "已保存并同步。"
+
+#: view/fm160/dial.js
+msgid "Saving does not dial — press Connect. Changing the mode may restart the USB profile (30-90 s)."
+msgstr "保存不会拨号——请按连接。切换模式可能重启 USB 配置（30-90 秒）。"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "Search cells now"
+msgstr "立即搜索小区"
+
+#: view/fm160/sms.js
+msgid "Segments in it"
+msgstr "其中分段数"
+
+#: view/fm160/cells.js
+msgid "Select at least one band first."
+msgstr "请先至少选择一个频段。"
+
+#: view/fm160/cells.js
+msgid "Selected: %s"
+msgstr "已选：%s"
+
+#: view/fm160/debug.js view/fm160/sms.js
+msgid "Send"
+msgstr "发送"
+
+#: view/fm160/sms.js
+msgid "Send failed"
+msgstr "发送失败"
+
+#: view/fm160/sms.js
+msgid "Send this message?"
+msgstr "发送这条消息？"
+
+#: view/fm160/cells.js
+msgid "Sends AT+GTCCINFO? (serving cell and up to ten LTE / NR neighbours) and AT+GTCAINFO? (carrier aggregation) live, instead of relying on the daemon snapshot. AT+GTCELLSCAN is not used: on this firmware it blocks the AT channel for ~50 s and returns nothing."
+msgstr "实时下发 AT+GTCCINFO?（服务小区及最多十个 LTE / NR 邻区）与 AT+GTCAINFO?（载波聚合），不依赖守护进程快照。不使用 AT+GTCELLSCAN：该固件上它会阻塞 AT 通道约 50 秒且无任何返回。"
+
+#: view/fm160/sms.js
+msgid "Sends accepted"
+msgstr "被接受的发送"
+
+#: view/fm160/sms.js
+msgid "Sends failed"
+msgstr "失败的发送"
+
+#: view/fm160/sms.js
+msgid "Sends that timed out"
+msgstr "超时的发送"
+
+#: view/fm160/overview.js view/fm160/sms.js
+msgid "Sent"
+msgstr "已发送"
+
+#: view/fm160/gnss.js
+msgid "Sentences in the last block"
+msgstr "最后一个块的语句数"
+
+#: view/fm160/overview.js
+msgid "Serial number"
+msgstr "序列号"
+
+#: view/fm160/overview.js
+msgid "Serving RAT"
+msgstr "服务 RAT"
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgid "Serving cell"
+msgstr "服务小区"
+
+#: view/fm160/overview.js
+msgid "Session total"
+msgstr "会话累计"
+
+#: view/fm160/gnss.js
+msgid "Set the satellite combination to"
+msgstr "把卫星组合设为"
+
+#: view/fm160/dial.js
+msgid "Settings saved. Press Connect to dial."
+msgstr "设置已保存。按连接开始拨号。"
+
+#: view/fm160/sms.js
+msgid "Setup completed"
+msgstr "设置已完成"
+
+#: menu.d
+msgid "Signal Quality"
+msgstr "信号质量"
+
+#: view/fm160/gnss.js
+msgid "Size of the last empty answer"
+msgstr "最后一次空应答的大小"
+
+#: view/fm160/overview.js
+msgid "Slowest reply"
+msgstr "最慢应答"
+
+#: view/fm160/gnss.js
+msgid "Speed"
+msgstr "速度"
+
+#: view/fm160/cells.js view/fm160/gnss.js view/fm160/usb.js
+msgid "State"
+msgstr "状态"
+
+#: view/fm160/sms.js
+msgid "Storage"
+msgstr "存储"
+
+#: view/fm160/sms.js
+msgid "Storage in use"
+msgstr "正在使用的存储"
+
+#: view/fm160/sms.js
+msgid "Storage state read"
+msgstr "存储状态已读取"
+
+#: view/fm160/usb.js
+msgctxt "fm160 profile action"
+msgid "Switch"
+msgstr "切换"
+
+#: view/fm160/usb.js
+msgid "Switch USB profile?"
+msgstr "切换 USB 配置？"
+
+#: view/fm160/gnss.js
+msgid "Switch the GNSS engine off"
+msgstr "关闭 GNSS 引擎"
+
+#: view/fm160/gnss.js
+msgid "Switch the GNSS engine on"
+msgstr "打开 GNSS 引擎"
+
+#: view/fm160/dial.js
+msgid "Switching USB profile..."
+msgstr "正在切换 USB 配置…"
+
+#: view/fm160/usb.js
+msgid "Switching a profile restarts the module."
+msgstr "切换配置会重启模组。"
+
+#: view/fm160/mwan.js
+msgid "Sync failed"
+msgstr "同步失败"
+
+#: view/fm160/mwan.js
+msgid "Sync now"
+msgstr "立即同步"
+
+#: view/fm160/mwan.js
+msgid "Synced."
+msgstr "已同步。"
+
+#: view/fm160/overview.js
+msgid "TAC"
+msgstr "TAC"
+
+#: view/fm160/overview.js
+msgid "TX %s / RX %s"
+msgstr "TX %s / RX %s"
+
+#: view/fm160/gnss.js
+msgid "Talker"
+msgstr "Talker"
+
+#: view/fm160/sms.js
+msgid "Text"
+msgstr "正文"
+
+#: view/fm160/usb.js
+msgid "The ECM profile is dialled by fm160d itself, and a"
+msgstr "ECM 配置由 fm160d 自己拨，另有一个"
+
+#: view/fm160/cells.js
+msgid "The RAT preference is left untouched - only the band list changes."
+msgstr "RAT 偏好保持不变——只有频段列表会变。"
+
+#: view/fm160/cells.js
+msgid "The answer also contained the \"automatic band selection\" marker, which normally means \"unrestricted\"."
+msgstr "应答里还带有「自动选频」标记，这通常意味着「无限制」。"
+
+#: view/fm160/cells.js
+msgid "The current connection drops while the modem re-scans."
+msgstr "模组重新扫描时当前连接会中断。"
+
+#: view/fm160/sms.js
+msgid "The daemon has not finished asking the modem whether it can handle SMS."
+msgstr "守护进程还没问完模组是否支持短信。"
+
+#: view/fm160/gnss.js
+msgid "The daemon reads the setting back after writing it, and only reports success once the modem agrees - so a failure here means the value was not applied."
+msgstr "守护进程写入后会回读该设置，只有模组确认后才报告成功——因此这里失败就意味着值没有生效。"
+
+#: view/fm160/usb.js
+msgid "The daemon refused the switch"
+msgstr "守护进程拒绝了这次切换"
+
+#: view/fm160/gnss.js
+msgid "The engine keeps running throughout; no reset is involved."
+msgstr "整个过程引擎持续运行，不涉及复位。"
+
+#: view/fm160/cells.js
+msgid "The following values will be written to the modem:"
+msgstr "以下值将写入模组："
+
+#: view/fm160/mwan.js
+msgid "The hotplug hook re-runs the registration on every interface up/down, so plugging or unplugging a cable is enough - no save needed."
+msgstr "hotplug 钩子会在每个接口 up/down 时重跑注册，插拔网线即可生效——无需保存。"
+
+#: view/fm160/gnss.js
+msgid "The last answer contained no NMEA sentence."
+msgstr "上一次应答里没有 NMEA 语句。"
+
+#: view/fm160/sms.js
+msgid "The modem accepted the capability questions but the storage could not be brought into use, and it gave no error text. See the diagnostics below."
+msgstr "模组接受了能力查询，但存储无法启用，而且没有给出错误文本。见下方的诊断。"
+
+#: view/fm160/usb.js
+msgid "The modem disappears from the USB bus and comes back as a different device, so the network drops for roughly 30-90 s. fm160d reads the profile back afterwards: if it did not change it rolls back once, and if the module never answers it stops and says so above."
+msgstr "模组会从 USB 总线上消失、再以另一个设备回来，因此网络中断约 30–90 秒。之后 fm160d 会回读配置：如果没变就回滚一次；如果模组始终不应答，它就停下来并在上方说明。"
+
+#: view/fm160/sms.js
+msgid "The modem has no copy of this one; only the entry held here is removed."
+msgstr "模组没有这条的副本；只会删除这里保存的这一条。"
+
+#: view/fm160/sms.js
+msgid "The modem has not accepted the SMS setup - see the message at the top of this page."
+msgstr "模组没有接受短信设置——见本页顶部的提示。"
+
+#: view/fm160/sms.js
+msgid "The modem has not accepted the SMS setup, so it cannot be asked for messages."
+msgstr "模组没有接受短信设置，因此无法向它索取消息。"
+
+#: view/fm160/sms.js
+msgid "The modem has not accepted the SMS setup, so sending and refreshing are disabled. Nothing below has been lost: the list still shows messages the daemon kept from earlier."
+msgstr "模组没有接受短信设置，因此发送与刷新被禁用。下面的内容并没有丢：列表里仍然显示守护进程此前保存的消息。"
+
+#: view/fm160/sms.js
+msgid "The modem has not accepted the SMS setup."
+msgstr "模组没有接受短信设置。"
+
+#: view/fm160/gnss.js
+msgid "The modem has not answered AT+GTGPSCFG=? yet, so changing the satellite combination is disabled. The setting is stored, and a value the modem does not accept could not be taken back by guessing."
+msgstr "模组尚未回答 AT+GTGPSCFG=?，因此禁止修改卫星组合。该设置是持久的，而模组不接受的值无法靠猜来撤回。"
+
+#: view/fm160/usb.js
+msgid "The modem has not answered AT+GTUSBMODE=?, so nothing may be chosen."
+msgstr "模组尚未回答 AT+GTUSBMODE=?，因此没有可选项。"
+
+#: view/fm160/cells.js
+msgid "The modem has not answered the capability queries (AT+GTACT=? / AT+GTCELLLOCK=?) yet, so writing is disabled. Both settings are persistent, and a value the modem does not accept cannot be taken back by guessing."
+msgstr "模组尚未回答能力查询（AT+GTACT=? / AT+GTCELLLOCK=?），因此禁止写入。这两项设置都是持久的，而模组不接受的值无法靠猜来撤回。"
+
+#: view/fm160/cells.js
+msgid "The modem is currently restricted to %d bands."
+msgstr "模组当前被限制在 %d 个频段。"
+
+#: view/fm160/sms.js
+msgid "The modem is listing what it holds. The list refreshes itself when it answers."
+msgstr "模组正在列出它保存的消息。它应答后列表会自行刷新。"
+
+#: view/fm160/cells.js
+msgid "The modem reported no bands at all."
+msgstr "模组没有报告任何频段。"
+
+#: view/fm160/gnss.js
+msgid "The modem reports a separate value set for each field of AT+GTGPSCFG. Only x=%d is the satellite combination and only its set below can be written; the other fields are listed so that their numbers are not read as combinations."
+msgstr "模组为 AT+GTGPSCFG 的每个字段报告一组独立的值。只有 x=%d 是卫星组合，因此只有它下面那组可以写入；列出其他字段是为了避免把它们的数值误读成组合。"
+
+#: view/fm160/cells.js
+msgid "The modem reports no carrier aggregation. Note that a modem with no active data connection answers this query with a bare OK, so an empty table here is normal."
+msgstr "模组没有报告载波聚合。注意：没有活动数据连接的模组会用一句裸 OK 回答此查询，所以这里表格为空是正常的。"
+
+#: view/fm160/sms.js
+msgid "The modem said"
+msgstr "模组说"
+
+#: view/fm160/cells.js
+msgid "The modem stores this in its own flash and only applies it after a UE reset. This page never resets the modem - do not switch it to a mode without an AT port to \"force\" it. The value is in place and will take effect on the next power cycle."
+msgstr "模组把它存在自己的 flash 里，并且只在 UE 复位之后才生效。本页面从不复位模组——不要为了「强制」生效而把它切到没有 AT 口的模式。值已经写入，会在下次断电重启后生效。"
+
+#: view/fm160/cells.js
+msgid "The modem will re-scan the whole band set and the current connection will drop for a few seconds."
+msgstr "模组会重新扫描整个频段集合，当前连接会中断几秒。"
+
+#: view/fm160/usb.js
+msgid "The module is already in profile"
+msgstr "模组已经处于配置"
+
+#: view/fm160/usb.js
+msgid "The module is restarting in profile"
+msgstr "模组正在重启到配置"
+
+#: view/fm160/usb.js
+msgid "The module will restart in profile"
+msgstr "模组将重启到配置"
+
+#: view/fm160/gnss.js
+msgid "The only documented combination this modem accepts is already the one in use."
+msgstr "本模组接受的唯一有手册记载的组合，正是当前使用的这个。"
+
+#: view/fm160/usb.js
+msgid "The profile it is in now is not known, so there is nothing to go back to."
+msgstr "它当前所在的配置未知，因此没有可回退的目标。"
+
+#: view/fm160/usb.js
+msgid "The profile list could not be read"
+msgstr "配置清单读取失败"
+
+#: view/fm160/usb.js
+msgid "The profile the module is in is read back with AT+GTUSBMODE? rather than remembered, because 17 and 32 share a USB ID and so do 18 and 33 - the USB descriptors alone cannot tell which one is active."
+msgstr "模组当前处在哪个配置是用 AT+GTUSBMODE? 读回来的，而不是记下来的，因为 17 与 32 共用同一个 USB ID、18 与 33 也一样——单看 USB 描述符无法分辨生效的是哪一个。"
+
+#: view/fm160/gnss.js
+msgid "The receiver needs a moment after switching on; one or two of these in a row is the measured normal."
+msgstr "接收机开启后需要一点时间；连续出现一两次这种情况是实测的正常现象。"
+
+#: view/fm160/gnss.js
+msgid "The receiver stops, and at least one NMEA read will answer ERROR until it is switched on again."
+msgstr "接收机停止，并且在重新打开之前，至少会有一次 NMEA 读取回答 ERROR。"
+
+#: view/fm160/mwan.js
+msgid "The registration below is written to /etc/config/mwan3, but without the package installed it does nothing. Install it with"
+msgstr "以下注册会写入 /etc/config/mwan3，但没装该包不会生效。安装命令："
+
+#: view/fm160/gnss.js
+msgid "The setting is not stored by the module, so it will be off again after the next power cycle unless autostart is enabled."
+msgstr "模组不保存该设置，因此除非启用自动启动，下次断电重启后它会再次关闭。"
+
+#: view/fm160/mwan.js
+msgid "The status snapshot failed"
+msgstr "状态快照获取失败"
+
+#: view/fm160/usb.js
+msgid "The switch has been sent. The module is restarting; expect it to be gone for 30-90 s. This page will follow it."
+msgstr "切换命令已发出。模组正在重启；预计它会消失 30–90 秒。本页面会跟着它。"
+
+#: view/fm160/usb.js
+msgid "The switch request failed"
+msgstr "切换请求失败"
+
+#: view/fm160/sms.js
+msgid "The two multi-segment counters are the evidence for one specific question: whether a PDU that spans more than one USB packet can time out on this kernel. They are counted rather than assumed, so a workaround is only worth writing if the second number is non-zero."
+msgstr "这两个多段计数器是为一个特定问题留的证据：跨多个 USB 包的 PDU 在这个内核上是否会超时。它们是数出来的而不是假设的，因此只有当第二个数字非零时，写规避方案才值得。"
+
+#: view/fm160/gnss.js
+msgid "There is no position, so the position rows above are empty rather than zero. An indoor receiver with no sky view reports exactly this, and the module omits the position and time sentences entirely in that state - their absence is not damage."
+msgstr "没有定位，因此上面的位置行是空的而不是零。室内看不到天空的接收机报出的正是这个样子，此时模组会完全省略位置与时间语句——它们缺席并不代表损坏。"
+
+#: view/fm160/usb.js
+msgid "These are device dependent: the vendor lists them in its port table and says nothing else about them. They are refused unless this is ticked."
+msgstr "这些是设备相关的：厂商只在端口表里列了它们，其他一概没说。不勾选就会被拒绝。"
+
+#: view/fm160/usb.js
+msgid "This USB profile is not an ECM profile, so fm160d does not dial it."
+msgstr "当前 USB 配置不是 ECM 配置，因此 fm160d 不拨它。"
+
+#: view/fm160/cells.js
+msgid "This is stored in the modem's own flash and only applied after a UE reset, which this page never performs."
+msgstr "这会存入模组自己的 flash，且只在 UE 复位后才应用，而本页面从不执行复位。"
+
+#: view/fm160/gnss.js
+msgid "This is stored in the module and survives a power cycle."
+msgstr "这会保存在模组里，断电重启后仍然有效。"
+
+#: view/fm160/cells.js
+msgid "This modem reports no bands for this RAT."
+msgstr "本模组在此 RAT 下没有报告任何频段。"
+
+#: view/fm160/usb.js
+msgid "This page is a convenience, not the guard. fm160d re-checks every request: the profile decision runs inside the same function that would send the command, so nothing here can widen what is allowed."
+msgstr "本页面只是方便，不是守卫。fm160d 会重新检查每一个请求：配置决策就在那个将要发出命令的函数里执行，所以这里没有任何东西能放宽允许范围。"
+
+#: view/fm160/gnss.js
+msgid "This powers up the GNSS receiver. It draws current even while it finds nothing, and on this hardware it is normally the only reason fm160d is talking to the modem at all."
+msgstr "这会为 GNSS 接收机供电。即使什么都没搜到它也在耗电，而在这套硬件上，它通常就是 fm160d 与模组通信的唯一原因。"
+
+#: view/fm160/usb.js
+msgid "This profile is not in the FM160 AT manual. It appears here only because you asked for the advanced list; nothing documents how it behaves."
+msgstr "这个配置不在 FM160 AT 手册里。它出现在这里只是因为你勾选了高级列表；没有任何文档描述它的行为。"
+
+#: view/fm160/sms.js
+msgid "This removes the modem's copy (AT+CMGD=%d) as well as the copy held here."
+msgstr "这会同时删除模组的副本（AT+CMGD=%d）和这里保存的副本。"
+
+#: view/fm160/overview.js
+msgid "This stops all automatic polling. The modem keeps working; only this manager goes quiet until you enable it again."
+msgstr "这会停止全部自动轮询。模组本身照常工作，只有本管理器保持静默，直到你重新启用。"
+
+#: view/fm160/usb.js
+msgid "This unit reports no profile this firmware knows how to name. Nothing is offered, because on any other platform the same mode numbers mean something else."
+msgstr "这台设备报告的配置里没有本固件能命名的。因此不提供任何选项——在别的平台上，同样的模式号含义完全不同。"
+
+#: view/fm160/sms.js
+msgid "This will be sent as"
+msgstr "将以如下方式发送："
+
+#: view/fm160/cells.js
+msgid "This writes %s and is stored in the modem."
+msgstr "这会写入 %s，并保存在模组里。"
+
+#: view/fm160/cells.js
+msgid "This writes %s, i.e. automatic band selection for every supported RAT."
+msgstr "这会写入 %s，即对每种受支持的 RAT 都启用自动选频。"
+
+#: view/fm160/cells.js
+msgid "This writes AT+GTCELLLOCK=0."
+msgstr "这会写入 AT+GTCELLLOCK=0。"
+
+#: view/fm160/logs.js view/fm160/sms.js
+msgid "Time"
+msgstr "时间"
+
+#: view/fm160/sms.js
+msgid "Time (as stamped)"
+msgstr "时间（按戳记）"
+
+#: view/fm160/sms.js
+msgid "To"
+msgstr "收件人"
+
+#: view/fm160/mwan.js
+msgid "Track targets IPv4 (space separated)"
+msgstr "IPv4 探测目标（空格分隔）"
+
+#: view/fm160/mwan.js
+msgid "Track targets IPv6 (space separated)"
+msgstr "IPv6 探测目标（空格分隔）"
+
+#: view/fm160/dial.js view/fm160/overview.js
+msgid "Traffic"
+msgstr "流量"
+
+#: view/fm160/gnss.js
+msgid "Turn the engine off"
+msgstr "关闭引擎"
+
+#: view/fm160/gnss.js
+msgid "Turn the engine on"
+msgstr "打开引擎"
+
+#: view/fm160/usb.js
+msgid "USB ID"
+msgstr "USB ID"
+
+#: menu.d
+msgid "USB Mode"
+msgstr "USB 模式"
+
+#: fm160/api.js
+msgid "USB mode switch"
+msgstr "USB 模式切换"
+
+#: view/fm160/overview.js view/fm160/usb.js
+msgid "USB profile"
+msgstr "USB 配置"
+
+#: fm160/api.js
+msgid "USB rescan"
+msgstr "USB 重新扫描"
+
+#: view/fm160/gnss.js
+msgid "UTC"
+msgstr "UTC"
+
+#: view/fm160/gnss.js
+msgid "Uninterpreted"
+msgstr "未解释"
+
+#: view/fm160/sms.js
+msgid "Unread"
+msgstr "未读"
+
+#: view/fm160/gnss.js
+msgid "Unrecognised entries"
+msgstr "无法识别的条目"
+
+#: view/fm160/overview.js
+msgctxt "fm160 traffic direction"
+msgid "Up"
+msgstr "上行"
+
+#: view/fm160/sms.js
+msgid "Usable"
+msgstr "可用"
+
+#: view/fm160/gnss.js
+msgid "Used in fix"
+msgstr "参与定位"
+
+#: view/fm160/sms.js
+msgid "View"
+msgstr "查看"
+
+#: view/fm160/mwan.js
+msgid "Wired priority (metric)"
+msgstr "有线优先级（metric）"
+
+#: view/fm160/mwan.js
+msgid "Wired weight"
+msgstr "有线权重"
+
+#: view/fm160/mwan.js
+msgid "With the defaults above this is FAILOVER, not balancing: wired eth (metric 10) carries all traffic while it is up, and the FM160 link (metric 20) only takes over when wired goes down. Weights apply between members of the same metric tier only - set both classes to the same metric (e.g. 10/3 wired and 10/1 mobile) for true weighted balancing while both are up. Interfaces are discovered automatically - wired (device ethN) and the FM160 dial interface (whichever dial mode is active). Everything this feature writes into mwan3 is tagged and cleaned up when the interface disappears or auto-registration is turned off; your own mwan3 sections are never touched."
+msgstr "以上默认值是**故障转移**而不是分流：有线 eth（metric 10）在线时承担全部流量，有线掉线后 FM160 链路（metric 20）才接管。权重只在同一 metric 层的成员间生效——把两类的 metric 设成相同（例如有线 10/3、移动 10/1）才是双在线时按权重真分流。接口自动发现——有线（设备 ethN）与 FM160 拨号接口（当前激活的拨号模式）。本功能写入 mwan3 的内容全部带标记，接口消失或关闭自动注册时自动清理；你自己写的 mwan3 配置不会被触碰。"
+
+#: view/fm160/gnss.js
+msgid "Write"
+msgstr "写入"
+
+#: view/fm160/cells.js view/fm160/gnss.js
+msgid "Write to modem"
+msgstr "写入模组"
+
+#: view/fm160/gnss.js
+msgid "a group with no field name"
+msgstr "一组没有字段名的值"
+
+#: fm160/api.js
+msgid "activated"
+msgstr "已激活"
+
+#: fm160d/net.c
+msgid "activating"
+msgstr "正在激活"
+
+#: view/fm160/overview.js
+msgctxt "fm160 ca state"
+msgid "active"
+msgstr "活跃"
+
+#: view/fm160/usb.js
+msgid "advanced"
+msgstr "高级"
+
+#: view/fm160/sms.js
+msgid "ago"
+msgstr "前"
+
+#: fm160/api.js
+msgid "all five"
+msgstr "全部五个"
+
+#: fm160d/usbmode.c
+msgid "allowed"
+msgstr "允许"
+
+#: view/fm160/usb.js
+msgid "answered by the modem"
+msgstr "模组回答"
+
+#: view/fm160/dial.js
+msgid "auto (module DNS)"
+msgstr "自动（模组 DNS）"
+
+#: fm160/api.js
+msgid "band lock change"
+msgstr "频段锁变更"
+
+#: fm160d/net.c
+msgid "busy"
+msgstr "忙"
+
+#: fm160/api.js
+msgid "by PCI"
+msgstr "按 PCI"
+
+#: fm160/api.js
+msgid "by frequency"
+msgstr "按频率"
+
+#: view/fm160/debug.js
+msgid "bytes"
+msgstr "字节"
+
+#: view/fm160/debug.js
+msgid "call failed"
+msgstr "调用失败"
+
+#: fm160/api.js
+msgid "cell lock clear"
+msgstr "锁小区清除"
+
+#: fm160/api.js
+msgid "cell lock set"
+msgstr "锁小区设置"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "cell scan"
+msgstr "小区搜索"
+
+#: view/fm160/signal.js
+msgid "cells and locking"
+msgstr "小区与锁定"
+
+#: view/fm160/sms.js
+msgid "characters"
+msgstr "字符"
+
+#: fm160/api.js view/fm160/overview.js
+msgid "configured"
+msgstr "已配置"
+
+#: view/fm160/cells.js view/fm160/gnss.js
+msgid "confirmed by read-back."
+msgstr "已由回读确认。"
+
+#: fm160/api.js fm160d/net.c
+msgid "connected"
+msgstr "已连接"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "dB (raw)"
+msgstr "dB（原始值）"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "dBm (raw)"
+msgstr "dBm（原始值）"
+
+#: view/fm160/dial.js
+msgid "died unexpectedly"
+msgstr "异常退出"
+
+#: view/fm160/dial.js
+msgctxt "fm160 keepalive state"
+msgid "disabled"
+msgstr "已禁用"
+
+#: fm160d/net.c
+msgid "disconnected"
+msgstr "已断开"
+
+#: view/fm160/dial.js
+msgctxt "fm160 link state"
+msgid "down"
+msgstr "未连接"
+
+#: view/fm160/overview.js
+msgid "down %s/s / up %s/s"
+msgstr "下行 %s/s / 上行 %s/s"
+
+#: fm160/api.js
+msgid "empty"
+msgstr "空"
+
+#: fm160/api.js
+msgid "empty answers in a row"
+msgstr "连续空应答"
+
+#: fm160/api.js
+msgid "engine off"
+msgstr "引擎关闭"
+
+#: fm160/api.js
+msgid "engine on"
+msgstr "引擎已开"
+
+#: fm160/api.js
+msgid "engine on, 0 satellites in view - normal indoors"
+msgstr "引擎已开，0 颗可见卫星——室内属正常"
+
+#: fm160/api.js
+msgid "engine on, but no sentence yet"
+msgstr "引擎已开，但还没有语句"
+
+#: fm160/api.js
+msgid "engine on, still starting up"
+msgstr "引擎已开，仍在启动"
+
+#: fm160/api.js
+msgid "engine on, waiting for the first reading"
+msgstr "引擎已开，等待第一次读数"
+
+#: fm160/api.js
+msgid "engine state not read yet"
+msgstr "引擎状态尚未读取"
+
+#: view/fm160/logs.js
+msgid "entries"
+msgstr "条"
+
+#: fm160/api.js
+msgid "estimated"
+msgstr "估算"
+
+#: fm160/api.js fm160d/net.c view/fm160/cells.js view/fm160/gnss.js
+msgid "failed"
+msgstr "失败"
+
+#: view/fm160/dial.js
+msgid "fibocom-dial over qmi_wwan_f with QMAP aggregation. Multi-channel capable; single-flow throughput varies (modem firmware)."
+msgstr "fibocom-dial 跑在 qmi_wwan_f 上，QMAP 聚合。支持多通道；单流速率视模组固件而定。"
+
+#: view/fm160/gnss.js
+msgid "field"
+msgstr "字段"
+
+#: fm160/api.js
+msgid "fix acquired"
+msgstr "已定位"
+
+#: view/fm160/mwan.js
+msgid "fm160-mwan3-sync exited with"
+msgstr "fm160-mwan3-sync 退出码"
+
+#: view/fm160/usb.js
+msgid "fm160d"
+msgstr "fm160d"
+
+#: view/fm160/dial.js
+msgid "fm160d dials over AT; the module serves DHCP on usb0. Most mature path."
+msgstr "fm160d 通过 AT 拨号；模组在 usb0 上提供 DHCP。最成熟的路径。"
+
+#: view/fm160/gnss.js
+msgid "fm160d does not publish GNSS data - the installed daemon is older than this page."
+msgstr "fm160d 未发布 GNSS 数据——已安装的守护进程比本页面旧。"
+
+#: view/fm160/cells.js
+msgid "fm160d does not publish the locking data - the installed daemon is older than this page."
+msgstr "fm160d 未发布锁定数据——已安装的守护进程比本页面旧。"
+
+#: view/fm160/overview.js
+msgid "fm160d will drop the current port and scan /dev/ttyUSB* again. Safe to run at any time."
+msgstr "fm160d 会释放当前端口并重新扫描 /dev/ttyUSB*。任何时候都可以安全执行。"
+
+#: view/fm160/signal.js
+msgid "from AT+CSQ"
+msgstr "来自 AT+CSQ"
+
+#: fm160/api.js
+msgid "identity re-read"
+msgstr "重新读取身份"
+
+#: fm160d/net.c view/fm160/dial.js
+msgid "idle"
+msgstr "空闲"
+
+#: fm160/api.js
+msgid "in profile"
+msgstr "处于配置"
+
+#: fm160/api.js
+msgid "in the last"
+msgstr "最近"
+
+#: fm160/api.js
+msgid "in view, no fix yet"
+msgstr "可见但尚未定位"
+
+#: view/fm160/cells.js view/fm160/overview.js view/fm160/signal.js
+msgid "initiated"
+msgstr "已发起"
+
+#: view/fm160/usb.js
+msgid "interface exists so that netifd can own the address side of it. QMI and MBIM profiles are dialled by the kernel (uqmi / umbim) instead."
+msgstr "接口供 netifd 接管它的地址部分。QMI 与 MBIM 配置则改由内核（uqmi / umbim）拨号。"
+
+#: fm160/api.js
+msgid "invalid"
+msgstr "无效"
+
+#: view/fm160/debug.js
+msgid "limit"
+msgstr "超时上限"
+
+#: view/fm160/debug.js
+msgid "lines at level"
+msgstr "行，级别"
+
+#: view/fm160/debug.js
+msgid "log"
+msgstr "日志"
+
+#: fm160/api.js
+msgid "management pause"
+msgstr "暂停管理"
+
+#: fm160/api.js
+msgid "management resume"
+msgstr "恢复管理"
+
+#: view/fm160/overview.js
+msgid "manual radio cross-check refresh"
+msgstr "无线交叉验证手动刷新"
+
+#: view/fm160/cells.js
+msgid "manual trigger from the cells page"
+msgstr "小区页手动触发"
+
+#: view/fm160/signal.js
+msgid "manual trigger from the signal page"
+msgstr "信号页手动触发"
+
+#: view/fm160/dial.js
+msgid "mbimcli over cdc_mbim. Best measured single-flow speed (15-20 MB/s on this module)."
+msgstr "mbimcli 跑在 cdc_mbim 上。实测单流速度最佳（此模组 15-20 MB/s）。"
+
+#: view/fm160/mwan.js
+msgid "mobile"
+msgstr "移动"
+
+#: view/fm160/sms.js
+msgid "more than the 4 segments this daemon will send; the message will be refused"
+msgstr "超过本守护进程会发送的 4 段上限；该消息将被拒绝"
+
+#: view/fm160/mwan.js
+msgid "mwan3 is not installed."
+msgstr "mwan3 未安装。"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "neighbour cells"
+msgstr "个邻区"
+
+#: view/fm160/dial.js view/fm160/gnss.js view/fm160/sms.js
+msgid "no"
+msgstr "否"
+
+#: view/fm160/cells.js view/fm160/signal.js
+msgid "no carrier aggregation"
+msgstr "无载波聚合"
+
+#: fm160/api.js
+msgid "no fix"
+msgstr "未定位"
+
+#: view/fm160/sms.js
+msgid "no modem copy"
+msgstr "模组无副本"
+
+#: fm160/api.js
+msgid "no service"
+msgstr "无服务"
+
+#: fm160d/usbmode.c
+msgid "no such USB profile is known for this modem"
+msgstr "这台模组没有这个 USB 配置"
+
+#: fm160/api.js view/fm160/dial.js view/fm160/sms.js
+msgid "none"
+msgstr "无"
+
+#: view/fm160/overview.js
+msgid "none (PCC only)"
+msgstr "无（仅 PCC）"
+
+#: view/fm160/signal.js
+msgid "not applicable - CSQ carries SS-RSRP on this link"
+msgstr "不适用——本链路的 CSQ 携带的是 SS-RSRP"
+
+#: view/fm160/cells.js
+msgid "not decodable"
+msgstr "无法解码"
+
+#: view/fm160/overview.js
+msgid "not detected"
+msgstr "未检测到"
+
+#: view/fm160/dial.js
+msgid "not installed"
+msgstr "未安装"
+
+#: view/fm160/sms.js
+msgid "not read"
+msgstr "未读取"
+
+#: view/fm160/gnss.js
+msgid "not read yet"
+msgstr "尚未读取"
+
+#: view/fm160/usb.js
+msgid "not read yet - 17 and 32 share a USB ID, and so do 18 and 33, so the number has to be read back with AT+GTUSBMODE?"
+msgstr "尚未读取——17 与 32 共用 USB ID，18 与 33 也是，所以这个号只能用 AT+GTUSBMODE? 回读"
+
+#: fm160/api.js
+msgid "not registered"
+msgstr "未注网"
+
+#: view/fm160/gnss.js view/fm160/overview.js view/fm160/signal.js
+msgid "not reported by this firmware"
+msgstr "本固件未报告"
+
+#: view/fm160/dial.js
+msgid "not yet (connect once to create it)"
+msgstr "尚未生成（先连接一次以创建）"
+
+#: fm160/api.js view/fm160/cells.js view/fm160/gnss.js
+msgctxt "fm160 off state"
+msgid "off"
+msgstr "关闭"
+
+#: view/fm160/cells.js view/fm160/gnss.js
+msgctxt "fm160 on state"
+msgid "on"
+msgstr "开启"
+
+#: view/fm160/usb.js
+msgid "once."
+msgstr "一次。"
+
+#: fm160/api.js
+msgid "one empty answer"
+msgstr "一次空应答"
+
+#: fm160/api.js
+msgid "other"
+msgstr "其他"
+
+#: view/fm160/overview.js
+msgid "overview refresh"
+msgstr "概览刷新"
+
+#: view/fm160/signal.js
+msgid "page."
+msgstr "页面。"
+
+#: view/fm160/overview.js
+msgid "port"
+msgstr "端口"
+
+#: fm160/api.js
+msgid "profile not read yet"
+msgstr "配置尚未读取"
+
+#: view/fm160/overview.js
+msgid "quiet window"
+msgstr "静默窗"
+
+#: fm160/api.js view/fm160/cells.js
+msgctxt "fm160 raw marker"
+msgid "raw"
+msgstr "原始值"
+
+#: view/fm160/cells.js
+msgid "raw bw code"
+msgstr "原始带宽码"
+
+#: view/fm160/cells.js
+msgid "raw token"
+msgstr "原始 token"
+
+#: view/fm160/signal.js
+msgid "reference signal received power"
+msgstr "参考信号接收功率"
+
+#: view/fm160/signal.js
+msgid "reference signal received quality"
+msgstr "参考信号接收质量"
+
+#: fm160d/usbmode.c
+msgid "refused"
+msgstr "拒绝"
+
+#: fm160/api.js
+msgid "refused: no usable APN is configured"
+msgstr "拒绝：没有配置可用的 APN"
+
+#: fm160/api.js
+msgid "registered (home)"
+msgstr "已注网（本地）"
+
+#: fm160/api.js
+msgid "registered (roaming)"
+msgstr "已注网（漫游）"
+
+#: fm160/api.js
+msgid "registration denied"
+msgstr "注网被拒"
+
+#: view/fm160/dial.js
+msgid "running"
+msgstr "running"
+
+#: fm160/api.js
+msgid "searching"
+msgstr "搜索中"
+
+#: view/fm160/sms.js
+msgid "segment(s)"
+msgstr "段"
+
+#: view/fm160/sms.js
+msgid "septets"
+msgstr "septet"
+
+#: fm160d/net.c
+msgid "setting the PDP context"
+msgstr "正在设置 PDP 上下文"
+
+#: view/fm160/signal.js
+msgid "signal to interference plus noise"
+msgstr "信号与干扰加噪声比"
+
+#: view/fm160/dial.js
+msgid "stopped (given up)"
+msgstr "已停止（自动放弃）"
+
+#: view/fm160/sms.js
+msgid "text"
+msgstr "文本"
+
+#: fm160d/usbmode.c
+msgid "that profile has no AT interface, so the modem could never be switched back"
+msgstr "该配置没有 AT 接口，模组将再也无法切回"
+
+#: fm160d/usbmode.c
+msgid "that profile is not in the FM160 AT manual; it needs an explicit opt-in"
+msgstr "该配置不在 FM160 AT 手册里，需要显式确认"
+
+#: fm160/api.js
+msgid "the USB profile has not been read yet"
+msgstr "USB 配置尚未读取"
+
+#: view/fm160/debug.js
+msgid "the daemon returned no report"
+msgstr "守护进程没有返回报告"
+
+#: fm160d/usbmode.c
+msgid "the kernel has no driver for that profile's USB ID, so no AT port would appear"
+msgstr "内核没有该配置 USB ID 的驱动，因此不会出现 AT 口"
+
+#: view/fm160/usb.js
+msgid "the kernel stack"
+msgstr "内核协议栈"
+
+#: fm160d/usbmode.c
+msgid "the modem does not offer that profile"
+msgstr "模组不提供该配置"
+
+#: view/fm160/usb.js
+msgid "the modem has not answered AT+GTUSBMODE=? - no profile change is allowed until it does, which happens at boot and on a rescan"
+msgstr "模组尚未回答 AT+GTUSBMODE=?——在它回答之前不允许切换配置。这个问询在启动时和重新扫描时发生"
+
+#: fm160d/usbmode.c
+msgid "the modem has not answered AT+GTUSBMODE=?, so no profile change is allowed"
+msgstr "模组尚未回答 AT+GTUSBMODE=?，因此不允许切换配置"
+
+#: fm160d/usbmode.c
+msgid "the modem is already in that profile"
+msgstr "模组已经处于该配置"
+
+#: fm160/api.js
+msgid "the module answers ERROR - the engine is not really on"
+msgstr "模组回答 ERROR——引擎实际并未开启"
+
+#: fm160/api.js
+msgid "the module has not answered since the switch"
+msgstr "切换之后模组一直没有应答"
+
+#: fm160/api.js
+msgid "the module is restarting in profile"
+msgstr "模组正在重启到配置"
+
+#: fm160/api.js
+msgid "the switch was rolled back"
+msgstr "切换已回滚"
+
+#: fm160/api.js
+msgid "this profile is dialled by the kernel, not by fm160d"
+msgstr "该配置由内核拨号，而不是 fm160d"
+
+#: fm160/api.js
+msgid "total"
+msgstr "累计"
+
+#: fm160/api.js
+msgid "undocumented combination"
+msgstr "手册未记载的组合"
+
+#: fm160/api.js fm160d/net.c view/fm160/dial.js view/fm160/overview.js
+msgid "unknown"
+msgstr "未知"
+
+#: view/fm160/overview.js
+msgid "unknown - not yet read"
+msgstr "未知——尚未读取"
+
+#: view/fm160/cells.js
+msgid "unspecified"
+msgstr "未指定"
+
+#: view/fm160/debug.js
+msgctxt "fm160 diagnostics field"
+msgid "up"
+msgstr "已运行"
+
+#: view/fm160/dial.js
+msgid "up on %s"
+msgstr "运行于 %s"
+
+#: view/fm160/debug.js
+msgid "version"
+msgstr "版本"
+
+#: fm160d/net.c
+msgid "waiting for SIM"
+msgstr "等待 SIM"
+
+#: fm160d/net.c
+msgid "waiting for an address"
+msgstr "等待地址"
+
+#: fm160d/net.c
+msgid "waiting for registration"
+msgstr "等待注网"
+
+#: view/fm160/mwan.js
+msgid "wired"
+msgstr "有线"
+
+#: view/fm160/gnss.js
+msgid "xtra"
+msgstr "xtra"
+
+#: view/fm160/dial.js view/fm160/gnss.js view/fm160/sms.js
+msgid "yes"
+msgstr "是"
+
+#: view/fm160/dial.js
+msgid "yes (proto %s)"
+msgstr "是（协议 %s）"

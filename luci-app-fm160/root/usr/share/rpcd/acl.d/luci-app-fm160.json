@@ -1,0 +1,31 @@
+{
+	"luci-app-fm160": {
+		"description": "Grant access to the Fibocom FM160 modem manager",
+		"read": {
+			"ubus": {
+				"fm160": [ "status", "identity", "profile", "sms_list",
+					   "profiles", "diagnostics" ]
+			},
+			"file": {
+				"/usr/libexec/fm160-prefix-lan.sh": [ "exec" ],
+				"/usr/sbin/fm160-dial-ctl": [ "exec" ],
+				"/usr/sbin/fm160-oplog": [ "exec" ],
+				"/usr/sbin/fm160-mwan3-sync": [ "exec" ],
+				"/usr/sbin/mwan3": [ "exec" ]
+			},
+			"uci": [ "fm160", "mwan3" ]
+		},
+		"write": {
+			"ubus": {
+				"fm160": [ "at", "rescan", "ident", "enabled", "profile", "setbands", "setcelllock",
+					   "setgnss", "setgnsscfg",
+					   "sms_send", "sms_delete", "sms_markread", "sms_sync",
+					   "dial_start", "dial_stop", "dial_config", "setusbmode" ]
+			},
+			"file": {
+				"/etc/init.d/fm160-prefix": [ "exec" ]
+			},
+			"uci": [ "fm160" ]
+		}
+	}
+}

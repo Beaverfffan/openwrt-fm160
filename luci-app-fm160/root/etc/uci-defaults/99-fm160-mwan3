@@ -1,0 +1,6 @@
+#!/bin/sh
+# One-shot: make sure the mwan3 settings section exists on installs/upgrades.
+# Values are only seeded once; fm160-mwan3-sync ensures it too, this just
+# keeps /etc/config/fm160 self-documenting from the first boot.
+/usr/sbin/fm160-mwan3-sync status >/dev/null 2>&1 || true
+exit 0

@@ -1,0 +1,92 @@
+{
+	"admin/fm160": {
+		"title": "FM160",
+		"order": 45,
+		"action": {
+			"type": "firstchild"
+		},
+		"depends": {
+			"acl": [ "luci-app-fm160" ]
+		}
+	},
+	"admin/fm160/overview": {
+		"title": "Modem Overview",
+		"order": 10,
+		"action": {
+			"type": "view",
+			"path": "fm160/overview"
+		}
+	},
+	"admin/fm160/signal": {
+		"title": "Signal Quality",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "fm160/signal"
+		}
+	},
+	"admin/fm160/cells": {
+		"title": "Cells and Locking",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "fm160/cells"
+		}
+	},
+	"admin/fm160/dial": {
+		"title": "Dial",
+		"order": 35,
+		"action": {
+			"type": "view",
+			"path": "fm160/dial"
+		}
+	},
+	"admin/fm160/usb": {
+		"title": "USB Mode",
+		"order": 36,
+		"action": {
+			"type": "view",
+			"path": "fm160/usb"
+		}
+	},
+	"admin/fm160/gnss": {
+		"title": "GNSS",
+		"order": 40,
+		"action": {
+			"type": "view",
+			"path": "fm160/gnss"
+		}
+	},
+	"admin/fm160/mwan3": {
+		"title": "MWAN3",
+		"order": 45,
+		"action": {
+			"type": "view",
+			"path": "fm160/mwan"
+		}
+	},
+	"admin/fm160/sms": {
+		"title": "SMS",
+		"order": 50,
+		"action": {
+			"type": "view",
+			"path": "fm160/sms"
+		}
+	},
+	"admin/fm160/logs": {
+		"title": "Operations Log",
+		"order": 80,
+		"action": {
+			"type": "view",
+			"path": "fm160/logs"
+		}
+	},
+	"admin/fm160/debug": {
+		"title": "AT Console",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "fm160/debug"
+		}
+	}
+}

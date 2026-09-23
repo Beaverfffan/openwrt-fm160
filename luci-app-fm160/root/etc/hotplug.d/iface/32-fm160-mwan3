@@ -1,0 +1,18 @@
+#!/bin/sh
+# Re-run the mwan3 auto-registration when a WAN-side interface moves.
+# The sync script debounces, so a flood of ifup/ifdown events collapses
+# into one pass.
+[ "$ACTION" = "ifup" ] || [ "$ACTION" = "ifdown" ] || exit 0
+
+case "$INTERFACE" in
+	fm160|fm160v6) ;;
+	wan|wan6|wanb|wanb6) ;;
+	*)
+		case "$DEVICE" in
+			eth[0-9]*) ;;
+			*) exit 0 ;;
+		esac
+		;;
+esac
+
+/usr/sbin/fm160-mwan3-sync &

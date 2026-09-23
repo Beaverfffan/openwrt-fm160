@@ -1,0 +1,359 @@
+#!/bin/sh
+# fm160-mwan3-sync - register wired + FM160 dial interfaces into mwan3.
+#
+# Discovery (no name guessing):
+#   wired  - every network section whose device is ethN (the WAN side of a
+#            board like the H69K; LAN members sit in br-lan, docker in docker0)
+#   mobile - the network section whose proto is one of the FM160 protos
+#            (mbim_fm160 / qmi_fm160 / ecm_fm160), created by fm160-dial-ctl
+#
+# Every interface found becomes an mwan3 interface section + a member of the
+# "balanced" policy, with metric/weight from /etc/config/fm160, section
+# "mwan3".  Everything this script writes is tagged fm160_managed='1', and
+# managed sections whose network interface no longer exists are removed -
+# the user's own mwan3 sections are never touched (the older approach of
+# deleting every unknown interface section also deleted the user's work).
+#
+# IPv6: the FM160 link carries v4+v6 on ONE netifd interface, and an mwan3
+# section tracks exactly one family, so a proto-none companion interface
+# (<name>v6) on the same device is created when dial_v6 is on.  It exists
+# only so mwan3 can track the v6 side; it owns no addresses.
+#
+# Usage:
+#   fm160-mwan3-sync            sync, debounced (hotplug may fire in floods)
+#   fm160-mwan3-sync --force    sync now, no debounce (LuCI "Sync now")
+#   fm160-mwan3-sync status     JSON snapshot for the LuCI page
+
+CFG=fm160
+DEBOUNCE=/tmp/.fm160_mwan3_sync.ts
+MOBILE_PROTOS="mbim_fm160 qmi_fm160 ecm_fm160"
+
+log() { logger -t fm160-mwan3 "$*"; }
+
+# Values written by older revisions may carry literal quote characters (a
+# uci set with the quotes inside the value string); strip one layer.
+g() { uci -q get "$CFG.mwan3.$1" 2>/dev/null | sed "s/^'//; s/'\$//"; }
+
+# Create the settings section once, with the designed defaults, so both the
+# LuCI page and this script can rely on it existing.
+ensure_section() {
+	if uci -q get "$CFG.mwan3" >/dev/null 2>&1; then
+		return 0
+	fi
+	uci set "$CFG.mwan3=mwan3" >/dev/null
+	uci set "$CFG.mwan3.enabled=0" >/dev/null
+	uci set "$CFG.mwan3.wired_metric=10" >/dev/null
+	uci set "$CFG.mwan3.wired_weight=3" >/dev/null
+	uci set "$CFG.mwan3.mobile_metric=20" >/dev/null
+	uci set "$CFG.mwan3.mobile_weight=1" >/dev/null
+	uci add_list "$CFG.mwan3.track_ip4=223.5.5.5" >/dev/null
+	uci add_list "$CFG.mwan3.track_ip6=2400:3200::1" >/dev/null
+	uci set "$CFG.mwan3.count=1" >/dev/null
+	uci set "$CFG.mwan3.timeout=2" >/dev/null
+	uci set "$CFG.mwan3.interval=5" >/dev/null
+	uci set "$CFG.mwan3.failure_interval=5" >/dev/null
+	uci set "$CFG.mwan3.down=3" >/dev/null
+	uci set "$CFG.mwan3.up=3" >/dev/null
+	uci commit "$CFG"
+	log "created $CFG.mwan3 section with defaults"
+}
+
+net_ifaces() {
+	uci -q show network 2>/dev/null | sed -n 's/^network\.\([^=]*\)=interface$/\1/p'
+}
+
+is_mobile_proto() {
+	case " $MOBILE_PROTOS " in
+		*" $1 "*) return 0 ;;
+	esac
+	return 1
+}
+
+# --- status JSON (for the LuCI page) ---------------------------------------
+status() {
+	local installed=0 enabled=0 desired="" managed="" s proto dev
+	[ -f /etc/config/mwan3 ] && installed=1
+	[ "$(g enabled)" = 1 ] && enabled=1
+	for s in $(net_ifaces); do
+		proto=$(uci -q get "network.$s.proto")
+		is_mobile_proto "$proto" || continue
+		dev=$(uci -q get "network.$s.device")
+		desired="$desired{\"name\":\"$s\",\"family\":\"ipv4\",\"class\":\"mobile\",\"device\":\"$dev\"},"
+		[ -n "$(uci -q get network.${s}v6)" ] && \
+			desired="$desired{\"name\":\"${s}v6\",\"family\":\"ipv6\",\"class\":\"mobile\",\"device\":\"$dev\"},"
+	done
+	for s in $(net_ifaces); do
+		dev=$(uci -q get "network.$s.device")
+		[ -z "$dev" ] && dev=$(uci -q get "network.$s.ifname")
+		case "$dev" in eth[0-9]*) ;; *) continue ;; esac
+		proto=$(uci -q get "network.$s.proto")
+		case "$proto" in dhcpv6|6in4|6to4|6rd) ;; *) continue ;; esac
+		desired="$desired{\"name\":\"$s\",\"family\":\"ipv6\",\"class\":\"wired\",\"device\":\"$dev\"},"
+	done
+	for s in $(net_ifaces); do
+		dev=$(uci -q get "network.$s.device")
+		[ -z "$dev" ] && dev=$(uci -q get "network.$s.ifname")
+		case "$dev" in eth[0-9]*) ;; *) continue ;; esac
+		proto=$(uci -q get "network.$s.proto")
+		case "$proto" in dhcpv6|6in4|6to4|6rd) continue ;; esac
+		is_mobile_proto "$proto" && continue
+		desired="$desired{\"name\":\"$s\",\"family\":\"ipv4\",\"class\":\"wired\",\"device\":\"$dev\"},"
+	done
+	for s in $(uci -q show mwan3 2>/dev/null | sed -n 's/^mwan3\.\([^=]*\)=interface$/\1/p'); do
+		[ "$(uci -q get mwan3.$s.fm160_managed)" = 1 ] && \
+			managed="$managed{\"name\":\"$s\",\"family\":\"$(uci -q get mwan3.$s.family)\",\"metric\":\"$(uci -q get mwan3.$s.metric)\"},"
+	done
+	printf '{"installed":%s,"enabled":%s,"desired":[%s],"managed":[%s]}\n' \
+		"$installed" "$enabled" "${desired%,}" "${managed%,}"
+}
+
+# --- one sync pass ----------------------------------------------------------
+set_if_diff() {
+	# $1 package $2 section $3 key $4 value; returns 1 (fail) so the caller's
+	# `&& changed=1` idiom works under `set -e`-free plain sh
+	[ "$(uci -q get "$1.$2.$3" 2>/dev/null)" = "$4" ] && return 0
+	uci set "$1.$2.$3=$4" >/dev/null
+	return 1
+}
+
+# set_if_diff returns 1 when it DID change, so `sifd ... || MW=1` collects a
+# change flag without `set -e`.
+MW=0
+sifd() { set_if_diff "$@" || MW=1; }
+
+do_sync() {
+	local enabled wired_metric wired_weight mobile_metric mobile_weight
+	local count timeout interval failure_interval down up
+	local desired="" desired_names="" stale_members=""
+	local s proto dev family miface mdev dv4 dv6 network_changed=0 mwan_changed=0
+
+	ensure_section
+
+	enabled=$(g enabled);       enabled=${enabled:-0}
+	wired_metric=$(g wired_metric);   wired_metric=${wired_metric:-10}
+	wired_weight=$(g wired_weight);   wired_weight=${wired_weight:-3}
+	mobile_metric=$(g mobile_metric); mobile_metric=${mobile_metric:-20}
+	mobile_weight=$(g mobile_weight); mobile_weight=${mobile_weight:-1}
+	count=$(g count);           count=${count:-1}
+	timeout=$(g timeout);       timeout=${timeout:-2}
+	interval=$(g interval);     interval=${interval:-5}
+	failure_interval=$(g failure_interval); failure_interval=${failure_interval:-5}
+	down=$(g down);             down=${down:-3}
+	up=$(g up);                 up=${up:-3}
+
+	if [ ! -f /etc/config/mwan3 ]; then
+		if [ "$enabled" = 1 ]; then
+			log "mwan3 is not installed - 'opkg install mwan3' first"
+			return 1
+		fi
+		return 0
+	fi
+
+	# -- discover ------------------------------------------------------------
+
+	miface=""
+	for s in $(net_ifaces); do
+		proto=$(uci -q get "network.$s.proto")
+		if is_mobile_proto "$proto"; then
+			miface=$s
+			mdev=$(uci -q get "network.$s.device")
+		fi
+	done
+
+	if [ "$enabled" = 1 ]; then
+		for s in $(net_ifaces); do
+			proto=$(uci -q get "network.$s.proto")
+			is_mobile_proto "$proto" && continue
+			dev=$(uci -q get "network.$s.device")
+			[ -z "$dev" ] && dev=$(uci -q get "network.$s.ifname")
+			case "$dev" in eth[0-9]*) ;; *) continue ;; esac
+			family=ipv4
+			case "$proto" in dhcpv6|6in4|6to4|6rd) family=ipv6 ;; esac
+			desired="$desired $s:$family:$wired_metric:$wired_weight:wired"
+			set_if_diff network "$s" metric "$wired_metric" || network_changed=1
+		done
+
+		if [ -n "$miface" ]; then
+			dv4=$(uci -q get "$CFG.main.dial_v4"); dv4=${dv4:-1}
+			dv6=$(uci -q get "$CFG.main.dial_v6"); dv6=${dv6:-1}
+
+			[ "$dv4" = 1 ] && \
+				desired="$desired $miface:ipv4:$mobile_metric:$mobile_weight:mobile"
+
+			if [ "$dv6" = 1 ]; then
+				desired="$desired ${miface}v6:ipv6:$((mobile_metric + 1)):$mobile_weight:mobile"
+				if ! uci -q get "network.${miface}v6" >/dev/null 2>&1; then
+					uci set "network.${miface}v6=interface" >/dev/null
+					network_changed=1
+				fi
+				set_if_diff "network" "${miface}v6" proto none || network_changed=1
+				set_if_diff "network" "${miface}v6" device "$mdev" || network_changed=1
+				set_if_diff "network" "${miface}v6" auto 1 || network_changed=1
+			elif uci -q get "network.${miface}v6" >/dev/null 2>&1; then
+				uci -q delete "network.${miface}v6"
+				network_changed=1
+			fi
+
+			set_if_diff network "$miface" metric "$mobile_metric" || network_changed=1
+		fi
+	fi
+
+	# the v6 stub only exists to serve mwan3 tracking; when registration is
+	# off (or v6 dialling is off, handled above) it goes away too
+	if [ "$enabled" != 1 ] && [ -n "$miface" ] && \
+	   uci -q get "network.${miface}v6" >/dev/null 2>&1; then
+		uci -q delete "network.${miface}v6"
+		network_changed=1
+	fi
+
+	# -- drop managed sections whose interface is gone ------------------------
+	for s in $desired; do
+		desired_names="$desired_names ${s%%:*}"
+	done
+
+	for s in $(uci -q show mwan3 2>/dev/null | sed -n 's/^mwan3\.\([^=]*\)=interface$/\1/p'); do
+		[ "$(uci -q get mwan3.$s.fm160_managed)" = 1 ] || continue
+		case " $desired_names " in
+			*" $s "*) continue ;;
+		esac
+		uci -q delete "mwan3.$s"
+		stale_members="$stale_members ${s}_m"
+		mwan_changed=1
+	done
+	for s in $(uci -q show mwan3 2>/dev/null | sed -n 's/^mwan3\.\([^=]*\)=member$/\1/p'); do
+		[ "$(uci -q get mwan3.$s.fm160_managed)" = 1 ] || continue
+		iface=${s%_m}
+		case " $desired_names " in
+			*" $iface "*) continue ;;
+		esac
+		uci -q delete "mwan3.$s"
+		stale_members="$stale_members $s"
+		mwan_changed=1
+	done
+
+	# strip stale members out of every policy
+	if [ -n "$stale_members" ]; then
+		for s in $(uci -q show mwan3 2>/dev/null | sed -n 's/^mwan3\.\([^=]*\)=policy$/\1/p'); do
+			for m in $stale_members; do
+				uci -q del_list "mwan3.$s.use_member=$m"
+			done
+		done
+	fi
+
+	# -- write desired sections ------------------------------------------------
+	for s in $desired; do
+		name=${s%%:*}; rest=${s#*:}
+		family=${rest%%:*}; rest=${rest#*:}
+		metric=${rest%%:*}; rest=${rest#*:}
+		weight=${rest%%:*}
+
+		MW=0
+		uci -q get "mwan3.$name" >/dev/null 2>&1 || { uci set "mwan3.$name=interface" >/dev/null; MW=1; }
+		sifd mwan3 "$name" enabled 1
+		sifd mwan3 "$name" initial_state online
+		sifd mwan3 "$name" family "$family"
+		sifd mwan3 "$name" track_method ping
+		sifd mwan3 "$name" reliability 1
+		sifd mwan3 "$name" count "$count"
+		sifd mwan3 "$name" timeout "$timeout"
+		sifd mwan3 "$name" interval "$interval"
+		sifd mwan3 "$name" failure_interval "$failure_interval"
+		sifd mwan3 "$name" down "$down"
+		sifd mwan3 "$name" up "$up"
+		sifd mwan3 "$name" metric "$metric"
+		sifd mwan3 "$name" flush_conntrack 0
+		sifd mwan3 "$name" fm160_managed 1
+		[ "$MW" = 1 ] && mwan_changed=1
+
+		# track IPs, per family
+		if [ "$family" = ipv6 ]; then
+			track=$(g track_ip6)
+		else
+			track=$(g track_ip4)
+		fi
+		cur=$(uci -q get "mwan3.$name.track_ip" 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//')
+		new=$(echo $track | sed 's/  */ /g; s/^ //; s/ $//')
+		if [ "$cur" != "$new" ]; then
+			uci -q delete "mwan3.$name.track_ip"
+			for ip in $new; do
+				uci add_list "mwan3.$name.track_ip=$ip" >/dev/null
+			done
+			mwan_changed=1
+		fi
+
+		MW=0
+		uci -q get "mwan3.${name}_m" >/dev/null 2>&1 || { uci set "mwan3.${name}_m=member" >/dev/null; MW=1; }
+		sifd mwan3 "${name}_m" interface "$name"
+		sifd mwan3 "${name}_m" metric "$metric"
+		sifd mwan3 "${name}_m" weight "$weight"
+		sifd mwan3 "${name}_m" fm160_managed 1
+		[ "$MW" = 1 ] && mwan_changed=1
+	done
+
+	# -- policy membership -----------------------------------------------------
+	if [ -n "$desired" ]; then
+		if ! uci -q get mwan3.balanced >/dev/null 2>&1; then
+			uci set mwan3.balanced=policy
+			uci set mwan3.balanced.last_resort=unreachable
+			mwan_changed=1
+		fi
+		for s in $desired; do
+			name=${s%%:*}
+			if ! uci -q get mwan3.balanced.use_member 2>/dev/null | tr ' ' '\n' | grep -qx "${name}_m"; then
+				uci add_list "mwan3.balanced.use_member=${name}_m" >/dev/null
+				mwan_changed=1
+			fi
+		done
+	fi
+
+	[ "$network_changed" = 1 ] && {
+		uci commit network
+		# a new/changed section (the v6 stub, metrics) is invisible to netifd
+		# until it reloads its config; reload is incremental, interfaces that
+		# did not change are not bounced
+		/etc/init.d/network reload
+	}
+	uci commit mwan3
+
+	if [ "$mwan_changed" = 1 ] && [ -x /etc/init.d/mwan3 ]; then
+		if [ "$enabled" = 1 ]; then
+			/etc/init.d/mwan3 enabled || /etc/init.d/mwan3 enable
+			/etc/init.d/mwan3 restart
+			log "mwan3 config changed, restarted"
+		elif /etc/init.d/mwan3 running; then
+			/etc/init.d/mwan3 restart
+			log "registration cleared, mwan3 restarted"
+		fi
+	fi
+
+	return 0
+}
+
+case "$1" in
+	status)
+		ensure_section
+		status
+		;;
+	--force)
+		do_sync
+		;;
+	sync)
+		do_sync
+		;;
+	"")
+		now=$(date +%s)
+		last=0
+		[ -f "$DEBOUNCE" ] && last=$(cat "$DEBOUNCE" 2>/dev/null || echo 0)
+		if [ $((now - last)) -lt 10 ]; then
+			exit 0
+		fi
+		echo "$now" > "$DEBOUNCE"
+		do_sync
+		;;
+	*)
+		echo "usage: fm160-mwan3-sync [--force|status]" >&2
+		exit 2
+		;;
+esac
+
+exit 0
