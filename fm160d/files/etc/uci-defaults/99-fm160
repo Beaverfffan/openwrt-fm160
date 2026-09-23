@@ -1,0 +1,113 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# fm160d ships a sane /etc/config/fm160, so there is nothing to migrate yet.
+# What we do need is to make sure no other modem manager fights us for the AT
+# port: fm160d is designed to be the single owner.
+
+[ -f /etc/config/fm160 ] || exit 0
+
+# --- M2: the two state sections ------------------------------------------
+#
+# The shipped config already declares them, but an upgrade keeps the OLD
+# /etc/config/fm160 (it is a conffile), and fm160d writes into these two
+# sections by name.  uci has no "create the section if it is missing", so it is
+# spelled out; the values are the same defaults the file ships with, so an
+# existing install ends up identical to a fresh one.
+if ! uci -q get fm160.dial >/dev/null; then
+	uci -q set fm160.dial=dial
+	uci -q set fm160.dial.reset_total='0'
+	uci -q set fm160.dial.reset_stamps=''
+	uci -q commit fm160
+fi
+if ! uci -q get fm160.switch >/dev/null; then
+	uci -q set fm160.switch=switch
+	uci -q set fm160.switch.pending='0'
+	uci -q set fm160.switch.pending_since='0'
+	uci -q set fm160.switch.target='-1'
+	uci -q set fm160.switch.rollback_mode='-1'
+	uci -q commit fm160
+fi
+
+# --- the LAN's IPv6 ------------------------------------------------------
+#
+# lan_ipv6 is newer than most installs, and an upgrade keeps the OLD
+# /etc/config/fm160 (it is a conffile).  uci has no "create the option if it is
+# missing", so it is spelled out; the value is the one the file ships with, so an
+# existing install ends up identical to a fresh one.
+#
+# Only a MISSING option is filled in.  An install that has the option at all
+# keeps whatever it says, including a deliberate 0 -- this runs on every
+# (re)install, and rewriting a user's choice here would make the setting
+# impossible to turn off from the config file.
+if ! uci -q get fm160.main.lan_ipv6 >/dev/null; then
+	uci -q set fm160.main.lan_ipv6='1'
+	uci -q commit fm160
+fi
+
+# Same treatment for the dial profile.  An install that predates it has no
+# dial_pdp at all and would otherwise stay IPv4-only by omission, which is
+# exactly the silent case the option exists to avoid.
+if ! uci -q get fm160.main.dial_pdp >/dev/null; then
+	uci -q set fm160.main.dial_pdp='IPV4V6'
+	uci -q commit fm160
+fi
+
+# --- keepalive defaults -----------------------------------------------------
+#
+# Same missing-only rule as lan_ipv6/dial_pdp: fill the ka_* options only when
+# an upgrade left them absent.  An existing install gains the watchdog with
+# the documented defaults (30 s interval, redial every failed round, module
+# reload after 5 consecutive failures, give up after 10 rounds in 24 h, DNS
+# auto from what the module reports).  ka_dns4/ka_dns6 stay unset (empty =
+# auto) unless the user fills them from the UI.
+if ! uci -q get fm160.main.ka_enable >/dev/null; then
+	uci -q set fm160.main.ka_enable='1'
+	uci -q set fm160.main.ka_interval='30'
+	uci -q set fm160.main.ka_reload_rounds='5'
+	uci -q set fm160.main.ka_stop_rounds='10'
+	uci -q commit fm160
+fi
+
+# Enabled, and now actually doing something: the init script installs the
+# prefix on boot if the link is already up, and does nothing at all while
+# lan_ipv6 is 0.  It is enabled because the whole point of the option is that
+# the prefix survives a reboot -- a service started only by the next hotplug
+# event would leave the LAN without global IPv6 until the link bounced.
+[ -x /etc/init.d/fm160-prefix ] && /etc/init.d/fm160-prefix enable
+
+# QMAP/MBIM boot autodial ships in the fibocom-dial package as the
+# fm160-dial init script; ECM autodials inside fm160d and does not need it.
+# Enabled for the same reason as the prefix service: the point of
+# dial_autostart is that the link survives a reboot.  The script itself
+# re-checks dial_autostart/dial_mode, so enabling it is harmless when the
+# install dials ECM or leaves autostart off.
+[ -x /etc/init.d/fm160-dial ] && /etc/init.d/fm160-dial enable
+
+# ModemManager opens every ttyUSB it finds and will interleave with our
+# transactions, so fm160d wants to be the single owner of the AT port.
+#
+# The question to ask is "will it actually start", not "is the binary on disk".
+# The first version tested the binary, which kept shouting "Disable it or remove
+# it" on a board where ModemManager had already been disabled -- and a warning
+# that is wrong is worse than no warning at all, because it is how you learn to
+# ignore the real one.
+if [ -x /etc/init.d/modemmanager ]; then
+	if /etc/init.d/modemmanager enabled; then
+		logger -t fm160d "WARNING: ModemManager is enabled; it will compete for the FM160 AT port. Run: /etc/init.d/modemmanager disable && /etc/init.d/modemmanager stop"
+	else
+		logger -t fm160d "note: ModemManager is installed but not enabled, so the AT port stays ours."
+	fi
+elif [ -x /usr/sbin/ModemManager ] || [ -x /usr/bin/ModemManager ]; then
+	logger -t fm160d "WARNING: ModemManager is present without an init script; check that nothing else is opening ttyUSB."
+fi
+
+# --- the two measured competitors ---------------------------------------
+#
+# adb-enablemodem (whose S99 script blocks on `adb wait-for-device`) and a
+# leftover iStoreOS interface on wwan0 both fight fm160d for the same
+# resources.  The whole reasoning, and the limits on what may be changed, live
+# in the script; this only runs it, once, at install time.
+[ -x /usr/libexec/fm160-preflight.sh ] && /usr/libexec/fm160-preflight.sh
+
+exit 0

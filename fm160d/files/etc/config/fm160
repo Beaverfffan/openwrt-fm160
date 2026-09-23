@@ -1,0 +1,152 @@
+config fm160 'main'
+	option enabled '1'
+
+	# Polling pace multiplier applied to every tier (1 = designed defaults,
+	# 2 = half as often, up to 6).  Raise it if the modem ever looks busy.
+	option tier_scale '1'
+
+	# Optional: pin the AT port instead of probing.  Leave unset normally so
+	# that USB re-enumeration is handled automatically.
+	# option port '/dev/ttyUSB2'
+
+	# Optional: pin the netdev used for the sysfs byte counters (zero AT cost).
+	# Auto-detected from wwan0 / usb0 when unset.
+	# option netdev 'wwan0'
+
+	# syslog level: 3=err 4=warn 6=info 7=debug
+	option log_level '6'
+
+	# Switch the GNSS engine on at boot, and again whenever the module comes
+	# back after disappearing.  Off by default: powering up a radio is the
+	# user's decision, and the engine costs current even with no fix.
+	#
+	# It has to be re-applied every time because AT+GTGPSPOWER is the one GNSS
+	# setting the module does NOT store - it comes back off after a power
+	# cycle.  This option is what makes it stick; leaving it at 0 does NOT
+	# mean "off", it means "whatever the module happens to be doing".
+	option gnss_autostart '0'
+
+	# ----------------------------------------------------------------
+	# M2: the data plane
+	# ----------------------------------------------------------------
+
+	# The APN of the PDP context fm160d dials.  Empty by default, and the
+	# daemon REFUSES to dial rather than guessing one: an invented APN is a
+	# context that activates, gets an address and routes nowhere, which
+	# looks like a broken modem instead of a missing setting.
+	#
+	# Only letters, digits, '.', '-' and '_' are accepted.  A quote, comma
+	# or semicolon in an APN would end the quoted argument of
+	# AT+CGDCONT= and turn the rest of the string into further AT fields,
+	# so anything else is refused rather than escaped.
+	# option dial_apn 'cmnet'
+
+	# One of IP, IPV6, IPV4V6.  Dual-stack by default.
+	#
+	# An IPv4-only context is a trap that does not look like one: it
+	# activates perfectly happily, gets an address and routes IPv4, and has
+	# no IPv6 at all -- so "the router has no IPv6" sends you looking at
+	# odhcpd, at the firewall, anywhere except at the context that never
+	# asked for a v6 address in the first place.  Asking for IPV4V6 costs
+	# nothing when the network has no v6 to give, and the LAN half of the
+	# feature (below) is inert until the context carries a prefix.
+	#
+	# IP or IPV6 remain valid choices: a metered SIM that bills the two
+	# families separately is exactly the case for a single-stack profile.
+	option dial_pdp 'IPV4V6'
+
+	# The PDP context id to use, 1..15.
+	option dial_cid '1'
+
+	# Dial as soon as the modem is reachable.  Off by default, and this is
+	# a separate decision from the PDP type above: one is "which families
+	# does the context carry", the other is "does the box spend money
+	# without being asked".  A link that comes up before anyone asked for
+	# it is a surprise on a metered SIM, and on a modem with no SIM it is a
+	# ladder that climbs forever, so this stays off and pressing Connect
+	# stays a deliberate act.  The LuCI page offers to turn it on at the
+	# moment of dialling, where the trade-off is legible.
+	option dial_autostart '0'
+
+	# ----------------------------------------------------------------
+	# Keepalive (link watchdog)
+	# ----------------------------------------------------------------
+
+	# After the link is up, /usr/sbin/fm160-keepalive pings the module-reported
+	# DNS (v4/v6 honouring the stack toggles) every ka_interval seconds.
+	# A failed round redials; ka_reload_rounds consecutive failures bounce the
+	# USB profile (module reload) and redial; ka_stop_rounds failed rounds
+	# inside a sliding 24 h window make the watchdog give up and report.
+	# ka_dns4/ka_dns6 override the ping targets per family (unset = auto).
+	option ka_enable '1'
+	option ka_interval '30'
+	option ka_reload_rounds '5'
+	option ka_stop_rounds '10'
+
+	# Let the reconnect ladder end in AT+CFUN=1,1 (a module reset).  Off by
+	# default, and the default is the safety property: with it off the
+	# ladder stops and reports instead of rebooting the module on a timer.
+	# Even when on, at most 3 resets are performed per 24 h (see the audit
+	# in the dial "resets" table) and then fm160d stops healing itself.
+	option dial_allow_reset '0'
+
+	# ----------------------------------------------------------------
+	# The LAN's IPv6
+	# ----------------------------------------------------------------
+
+	# The ECM link is given a single /64 by the network and no IA_PD, so without
+	# help the LAN has no global IPv6 at all: odhcpd has no prefix to hand out, and
+	# with only the ULA present it advertises a router lifetime of zero, which is
+	# the protocol's way of saying "do not use me as a gateway".
+	#
+	# With this on, that same /64 is put on br-lan, which is enough for odhcpd to
+	# advertise it as a real on-link prefix -- with a non-zero lifetime, because it
+	# is a global address and not a ULA -- so clients get a global address and a
+	# default route by ordinary RA, and odhcpd delegates a /62 out of it to the
+	# downstream router on the LAN without being told to.
+	#
+	# On by default, because the alternative is a LAN with no global IPv6 at all
+	# and no indication of why.  The two consequences worth knowing:
+	#   * the LAN's global addresses are the operator's prefix, so they change when
+	#     the operator prefix changes (reconnect, cell handover, module reset);
+	#   * odhcpd is given an ndp relay on the mobile interface.  The module resolves
+	#     each destination by neighbour discovery, one address at a time, and a
+	#     prefix that lives on br-lan is one it cannot find on its own - without
+	#     the relay, inbound connections stop at the request and never resolve.
+	#     The relay is odhcpd's own, so there is no extra daemon and no list of
+	#     client addresses to keep in step.
+	# The ULA the router already has stays where it is, so LAN-internal traffic and
+	# the router's own address are unaffected either way.
+	#
+	# It is inert until the mobile link carries a /64: with lan_ipv6 on and no
+	# prefix there is simply nothing to install, and the script waits for the
+	# hotplug event that follows a dial.  Set it to 0 to keep the LAN on ULA only,
+	# which is the right answer if the operator prefix must not reach the LAN.
+	option lan_ipv6 '1'
+
+	# Optional: pin the mobile netdev instead of auto-detecting it.  Leave unset; the
+	# name depends on the USB profile.
+	# option lan_ipv6_wan 'usb0'
+
+	# Optional: the LAN bridge to put the operator prefix on.  br-lan by default.
+	# option lan_ipv6_if 'br-lan'
+
+# The module-reset audit trail (DESIGN 4.3).  Written by fm160d, not by hand;
+# it lives in its own section because it has to survive a restart: without the
+# count, "three resets in 24 h and then stop" would reset its own limit every
+# time procd respawned the daemon.
+config dial 'dial'
+	option reset_total '0'
+	# Epoch seconds of the recent resets, newest first.
+	option reset_stamps ''
+
+# The USB profile switch (DESIGN 5.2).  `pending` is 1 only between the write
+# and the read-back that confirms it, and it is written BEFORE AT+GTUSBMODE:
+# after that command the module may re-enumerate, so this is the only record of
+# where it came from.  A switch applied just before the daemon died is still
+# verified on the next boot because of it.
+config switch 'switch'
+	option pending '0'
+	option pending_since '0'
+	option target '-1'
+	option rollback_mode '-1'

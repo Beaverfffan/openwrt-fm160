@@ -1,0 +1,49 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# fm160-prefix -- keep the operator's /64 on the LAN.
+#
+# This is a thin wrapper: every decision lives in
+# /usr/libexec/fm160-prefix-lan.sh, so that the same code can be run by hand
+# ("fm160-prefix-lan.sh status") while debugging, which a procd-shaped init
+# script makes awkward.
+#
+# START=95: after netifd (19) and after odhcpd (55) have settled, so that the
+# first apply sees a fully configured LAN rather than a bridge with no address.
+# It is deliberately NOT the job of this service to bring anything up -- if the
+# mobile link is not there yet the script logs that and waits for the hotplug
+# event that will happen when it is.
+
+START=95
+STOP=05
+
+# The hotplug hook calls the script directly, but a withdraw is also a thing you
+# want by hand while debugging (and from anything that knows the link is going
+# away before netifd does), so it is reachable through the init script too.
+extra_command "withdraw" "take the operator prefix off the LAN, leaving odhcpd alone"
+
+start() {
+	/usr/libexec/fm160-prefix-lan.sh apply
+}
+
+stop() {
+	/usr/libexec/fm160-prefix-lan.sh teardown
+}
+
+reload() {
+	/usr/libexec/fm160-prefix-lan.sh apply
+}
+
+restart() {
+	reload
+}
+
+status() {
+	/usr/libexec/fm160-prefix-lan.sh status
+}
+
+withdraw() {
+	# Deliberately without a device argument.  That guard is there for hotplug
+	# noise, and someone typing this by hand has already decided.
+	/usr/libexec/fm160-prefix-lan.sh withdraw
+}

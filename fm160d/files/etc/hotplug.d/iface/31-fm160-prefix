@@ -1,0 +1,48 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# The mobile link comes and goes, and so does its /64: the module hands out a
+# new prefix after every reconnect, and a firmware that kept the old one on the
+# LAN would be advertising a prefix the network no longer routes.
+#
+# So this hook exists only to notice.  It does not decide anything -- whether to
+# install, move or withdraw a prefix is entirely
+# /usr/libexec/fm160-prefix-lan.sh's job, and that script is idempotent: when the
+# prefix has not changed its whole effect is one `ip addr show`.
+#
+# The two directions are not symmetric, and that is the point of calling two
+# different entry points:
+#
+#   ifup / ifupdate -> apply     read the prefix and make sure it is installed
+#   ifdown          -> withdraw  take it off the LAN, now
+#
+# apply is written to leave the prefix in place when it cannot see a mobile
+# link, so it is the wrong call at an ifdown: by then the address is already off
+# the wan device and the device itself may be gone, which is exactly the case
+# apply declines to act on.  Withdrawing is not optional there -- a LAN left
+# holding a /64 that the module no longer routes keeps using it as a source
+# address, and the resulting "IPv6 is up but nothing works" has no obvious
+# cause.  withdraw leaves the odhcpd relay configuration intact so that a
+# reconnect does not restart odhcpd and blink every client on the bridge.
+#
+# $DEVICE goes along with the withdraw so that the script can tell whether this
+# event is about the mobile link at all.  netifd fires ifdown for every
+# interface in the zone and this board has four names pointed at the radio, so
+# without it an ifdown on an unrelated name would take the LAN's IPv6 away for
+# nothing.  It is passed rather than re-derived there because by withdraw time
+# the address may already be gone and a probe would answer the wrong question.
+
+[ "$ACTION" = "ifup" ] || [ "$ACTION" = "ifdown" ] || [ "$ACTION" = "ifupdate" ] || exit 0
+
+case "$INTERFACE" in
+	ecm|ecm6|wwan|wwan6|wan|wan6|usb0) ;;
+	*) exit 0 ;;
+esac
+
+[ -x /usr/libexec/fm160-prefix-lan.sh ] || exit 0
+
+if [ "$ACTION" = "ifdown" ]; then
+	/usr/libexec/fm160-prefix-lan.sh withdraw "$DEVICE"
+else
+	/usr/libexec/fm160-prefix-lan.sh apply
+fi

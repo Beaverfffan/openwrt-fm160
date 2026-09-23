@@ -1,0 +1,18 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# On any tty add/remove, ask fm160d to re-probe.  This makes USB
+# re-enumeration (which happens on every AT+GTUSBMODE change) converge fast
+# instead of waiting for the periodic rescan.
+
+[ "$ACTION" = "add" ] || [ "$ACTION" = "remove" ] || exit 0
+case "$DEVICENAME" in
+	ttyUSB*|ttyACM*) ;;
+	*) exit 0 ;;
+esac
+
+# Give udev/procd a moment to finish creating or removing the device node.
+(
+	sleep 2
+	ubus call fm160 rescan >/dev/null 2>&1
+) &
