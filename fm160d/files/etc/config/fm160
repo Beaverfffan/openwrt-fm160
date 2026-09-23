@@ -58,6 +58,16 @@ config fm160 'main'
 	# The PDP context id to use, 1..15.
 	option dial_cid '1'
 
+	# Which data path to dial: ecm | qmap | mbim.  ecm is the module's
+	# shipping profile (GTUSBMODE 33) and the only path that works with no
+	# extra drivers, so it is the default.  The value matters beyond the
+	# dial itself: fm160-keepalive's module-reload bounce derives the USB
+	# profile from it, and the dial page rewrites it on every mode switch.
+	# dial-ctl also falls back to ecm when this is unset, but keep it
+	# explicit: a missing key once sent a keepalive bounce to the wrong
+	# profile and the link never came back (2026-09-23).
+	option dial_mode 'ecm'
+
 	# Dial as soon as the modem is reachable.  Off by default, and this is
 	# a separate decision from the PDP type above: one is "which families
 	# does the context carry", the other is "does the box spend money

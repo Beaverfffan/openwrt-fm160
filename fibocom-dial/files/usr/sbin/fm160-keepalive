@@ -82,9 +82,17 @@ ping6() { ping -6 -c 1 -W 4 "$1" >/dev/null 2>&1; }
 # Proven recovery for a wedged module endpoint (see notes §23 坑1): a plain
 # redial is not enough once the modem side stops answering.
 reload_modem() {
-	local m want other
-	m=$(ucig dial_mode); m=${m:-mbim}
-	want=$(usbmode_for "$m")
+	local want other live
+	# Prefer the mode the module is ACTUALLY in (ubus), not the config:
+	# dial_mode is only written after a LuCI mode switch, so a fresh
+	# config misleads this bounce — 2026-09-23 incident: an ECM box
+	# defaulted to mbim here, bounced 30->32->30, and the dial never
+	# came back until the mode was restored by hand.
+	live=$(ubus call fm160 status 2>/dev/null | jsonfilter -e '@.usb_mode' 2>/dev/null)
+	case "$live" in
+		33|32|30) want=$live ;;
+		*)	want=$(usbmode_for "$(ucig dial_mode || echo ecm)") ;;
+	esac
 	case "$want" in
 		33) other=30 ;;
 		32) other=30 ;;
