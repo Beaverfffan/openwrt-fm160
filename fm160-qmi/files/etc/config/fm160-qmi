@@ -1,0 +1,18 @@
+config fm160-qmi 'main'
+	option enabled  '1'
+	# 模组自带的 profile 索引（本机 profile 1 = IPV4V6 / ctnet）
+	option profile  '1'
+	# 留空 = 用 profile；填了则用 --start-network --apn <值>
+	option apn      ''
+	# netifd 里承载蜂窝的那个接口名（本机已存在 network.2_1：proto=dhcp / device=wwan0）
+	option netif      '2_1'
+	# ipv4 | ipv6
+	#   ★★ 不要填 unspecified：137/137b 真机四变体实测，模组在「不传 / 传
+	#      unspecified」时回的是 **v6-only**（不是双栈）——会得到一条只有 v6 的链路。
+	#      一次 QMI 会话只给一个 IP 族；**双栈必须起两路 PDN**（见 README「多路 PDN」）。
+	option ipfam    'ipv4'
+	# 本接口默认路由的 metric。★ 保持较大值，避免顶掉 eth0 的默认路由
+	#   （本项目曾因 busybox udhcpc 的 default.script 删掉 eth0 默认路由把整机出口切走）。
+	option metric   '11'
+	# netifd/udhcpc 拿 lease 的最长等待（秒）。本模组会应答 DHCP，但实测要 20–60 s。
+	option dhcpwait '90'
