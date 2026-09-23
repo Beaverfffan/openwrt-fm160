@@ -1,0 +1,21 @@
+#!/bin/sh
+# Beaver image default: every radio up, one open SSID.
+# Runs after /bin/config_generate (see /etc/init.d/boot), so wireless
+# config already exists on first boot.
+# NOTE: config_generate creates NAMED wifi-device sections (radio0...),
+# so match the section TYPE suffix, never assume "wifi-deviceN" names.
+SSID=istoreos-beaverfffan
+
+for dev in $(uci show wireless 2>/dev/null | sed -n "s/^\(wireless\.[^=]*\)=wifi-device$/\1/p"); do
+	uci -q delete $dev.disabled
+done
+
+i=0
+while uci -q get wireless.@wifi-iface[$i] >/dev/null 2>&1; do
+	uci set wireless.@wifi-iface[$i].ssid="$SSID"
+	uci set wireless.@wifi-iface[$i].encryption=none
+	i=$((i + 1))
+done
+
+uci commit wireless
+exit 0
