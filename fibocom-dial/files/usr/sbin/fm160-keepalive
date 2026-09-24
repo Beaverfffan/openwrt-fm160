@@ -16,17 +16,24 @@
 # push the module's DNS servers).  ka_dns4/ka_dns6 override per family.
 #
 # Usage:
-#   fm160-keepalive run     daemon loop (started via setsid by dial-ctl up)
-#   fm160-keepalive start   start daemon if not already running
-#   fm160-keepalive stop    stop daemon
-#   fm160-keepalive status  JSON snapshot (settings + counters)
+#   fm160-keepalive run [4|6]  daemon loop (started via setsid by dial-ctl up);
+#                              optional family arg runs a split watchdog that
+#                              only checks v4 or only v6 (ka_split=1)
+#   fm160-keepalive start      start daemon(s) if not already running
+#   fm160-keepalive stop       stop daemon(s)
+#   fm160-keepalive status     JSON snapshot (settings + counters)
 #
 # State lives in /var/run (tmpfs): counters intentionally reset on reboot,
 # which also restarts the 24 h window.
 
 CFG=fm160
-STATE=/var/run/fm160-keepalive.state
-PIDFILE=/var/run/fm160-keepalive.pid
+BASE=/var/run/fm160-keepalive
+CTL=/usr/sbin/fm160-dial-ctl
+# FAM: empty = one daemon checks every enabled family; 4|6 = split daemon
+# (ka_split=1) that watches a single family with its own state/counters.
+FAM=
+STATE=$BASE.state
+PIDFILE=$BASE.pid
 CTL=/usr/sbin/fm160-dial-ctl
 
 log() { logger -t fm160-keepalive "$*"; }
@@ -40,8 +47,23 @@ ka_reload()  { ucig ka_reload_rounds || echo 5; }
 ka_stop()    { ucig ka_stop_rounds || echo 10; }
 ka_dns4()    { ucig ka_dns4; }
 ka_dns6()    { ucig ka_dns6; }
+ka_dns4_2()  { ucig ka_dns4_2; }
+ka_dns6_2()  { ucig ka_dns6_2; }
+ka_split()   { ucig ka_split || echo 0; }
 dial_v4()    { ucig dial_v4 || echo 1; }
 dial_v6()    { ucig dial_v6 || echo 1; }
+
+# Split daemon interval: the v6 watchdog runs at half frequency by default
+# (ka_interval x 2), overridable via ka_interval6.
+fam_interval() {
+	local v
+	if [ "$FAM" = 6 ]; then
+		v=$(ucig ka_interval6)
+		if [ -n "$v" ]; then echo "$v"; else echo $(( $(ka_interval) * 2 )); fi
+	else
+		ka_interval
+	fi
+}
 
 usbmode_for() { case "$1" in ecm) echo 33;; qmap) echo 32;; *) echo 30;; esac; }
 
@@ -103,7 +125,9 @@ state_write() {
 	cat > "$STATE" <<EOF
 state=$1
 last_check=$2
-last_targets=$3
+# quoted: targets now carry a space (primary + backup) and the state file
+# is re-sourced by status() — an unquoted value would execute as a command
+last_targets="$3"
 consec_fail=$CONSEC
 window_start=$WSTART
 window_rounds=$WCOUNT
@@ -129,8 +153,32 @@ has_addr4() { [ -n "$(ifstatus | jsonfilter -e '@["ipv4-address"][0].address' 2>
 has_addr6() { [ -n "$(ifstatus | jsonfilter -e '@["ipv6-address"][0].address' 2>/dev/null)" ]; }
 
 # ── ping ───────────────────────────────────────────────────────────────────
-ping4() { ping -c 1 -W 4 "$1" >/dev/null 2>&1; }
-ping6() { ping -6 -c 1 -W 4 "$1" >/dev/null 2>&1; }
+# per-target timeout 8 s (was 4): carrier RTT jitter was trimming real links.
+ping4() { ping -c 1 -W 8 "$1" >/dev/null 2>&1; }
+ping6() { ping -6 -c 1 -W 8 "$1" >/dev/null 2>&1; }
+
+# Two targets per family: primary = user override, else module-reported DNS;
+# secondary = second override, else AliDNS (223.5.5.5 / 2400:3200::1).  When
+# the module reports nothing the primary falls back to Ali and the secondary
+# to the second Ali anycast (223.6.6.6 / 2400:3200:baba::1).  A family counts
+# as OK when ANY of its targets answers — a round only fails when every
+# target of the family has timed out.
+targets4() {
+	local t1= t2=
+	t1=$(ka_dns4); [ -z "$t1" ] && t1=$(dns_from_netif | grep -m1 '\.')
+	t2=$(ka_dns4_2); [ -z "$t2" ] && t2=223.5.5.5
+	if [ -z "$t1" ]; then t1=$t2; t2=223.6.6.6; fi
+	[ "$t1" = "$t2" ] && t2=
+	echo "$t1 $t2" | sed 's/ $//'
+}
+targets6() {
+	local t1= t2=
+	t1=$(ka_dns6); [ -z "$t1" ] && t1=$(dns_from_netif | grep -m1 ':')
+	t2=$(ka_dns6_2); [ -z "$t2" ] && t2=2400:3200::1
+	if [ -z "$t1" ]; then t1=$t2; t2=2400:3200:baba::1; fi
+	[ "$t1" = "$t2" ] && t2=
+	echo "$t1 $t2" | sed 's/ $//'
+}
 
 # ── module reload: bounce the USB profile to the other mode and back ───────
 # Proven recovery for a wedged module endpoint (see notes §23 坑1): a plain
@@ -234,36 +282,47 @@ redial() {
 }
 
 # ── one check round ────────────────────────────────────────────────────────
-# Honours dial_v4/dial_v6: only enabled families are checked.  Return codes:
-#   0  every enabled family with an address answered the ping
-#   1  at least one enabled family failed (or the link is not up at all)
+# A split daemon (FAM=4|6) checks only its own family; the combined daemon
+# checks every family the dial stack enables.  Within a family ALL targets
+# must time out to fail it; the round fails when a checked family fails (or
+# the link is not up at all).  Return codes:
+#   0  every checked family had at least one target answering
+#   1  at least one checked family had ALL its targets time out
 #   2  nothing to check yet (link up but no address configured) — neutral
 check_round() {
-	local t4= t6= desc= checkable=0 ok=1
+	local fams="" fam targets t ok desc="" checkable=0
 
 	# 接口没起 = 失败（触发重拨），不能只跳过 —— 否则 setup 挂死会被掩盖
 	link_up || { TARGETS="link-down"; return 1; }
 
-	if [ "$(dial_v4)" = 1 ] && has_addr4; then
-		checkable=1
-		t4=$(ka_dns4)
-		[ -z "$t4" ] && t4=$(dns_from_netif | grep -m1 '\.')
-		[ -z "$t4" ] && t4=223.5.5.5
-		ping4 "$t4" || ok=0
-		desc="v4=$t4"
+	if [ -n "$FAM" ]; then
+		fams=$FAM
+	else
+		[ "$(dial_v4)" = 1 ] && fams="4"
+		[ "$(dial_v6)" = 1 ] && fams="$fams 6"
 	fi
-	if [ "$(dial_v6)" = 1 ] && has_addr6; then
+
+	for fam in $fams; do
+		if [ "$fam" = 4 ]; then
+			has_addr4 || continue
+			targets=$(targets4)
+		else
+			has_addr6 || continue
+			targets=$(targets6)
+		fi
 		checkable=1
-		t6=$(ka_dns6)
-		[ -z "$t6" ] && t6=$(dns_from_netif | grep -m1 ':')
-		[ -z "$t6" ] && t6=240c::6666
-		ping6 "$t6" || ok=0
+		ok=0
+		for t in $targets; do
+			if [ "$fam" = 4 ]; then ping4 "$t"; else ping6 "$t"; fi && ok=1
+			[ "$ok" = 1 ] && break
+		done
 		[ -n "$desc" ] && desc="$desc "
-		desc="${desc}v6=$t6"
-	fi
+		desc="${desc}v${fam}=$targets"
+		[ "$ok" = 1 ] || { TARGETS=$desc; return 1; }
+	done
 	TARGETS=$desc
 	[ "$checkable" = 0 ] && return 2
-	return $((1 - ok))
+	return 0
 }
 
 # ── daemon ─────────────────────────────────────────────────────────────────
@@ -275,7 +334,7 @@ run() {
 	CONSEC=0; WSTART=$(date +%s); WCOUNT=0; RELOADS=0; TOTAL=0; TARGETS=""
 	LAST_RELOAD=; LAST_RELOAD_AT=0
 	state_write running wait ""
-	log "started (interval=$(ka_interval)s reload=$(ka_reload) stop=$(ka_stop))"
+	log "started (family=${FAM:-both} interval=$(fam_interval)s reload=$(ka_reload) stop=$(ka_stop))"
 
 	# wait for the link before the first round; bail out on disable
 	while ! link_up; do
@@ -289,7 +348,7 @@ run() {
 	GRACE_UNTIL=0
 
 	while :; do
-		sleep "$(ka_interval)" 2>/dev/null || exit 0
+		sleep "$(fam_interval)" 2>/dev/null || exit 0
 		[ "$(ka_enable)" = 0 ] && { log "disabled by config"; state_write disabled wait ""; exit 0; }
 
 		now=$(date +%s)
@@ -344,7 +403,24 @@ run() {
 	done
 }
 
+start_one() {
+	# $1 = family (4|6); split daemon with its own state/pid files
+	local fam=$1 pidfile="$BASE.$fam.pid" pid
+	[ "$(ka_enable)" = 0 ] && return 0
+	pid=$(cat "$pidfile" 2>/dev/null)
+	if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+		return 0
+	fi
+	rm -f "$pidfile" "$BASE.$fam.state"
+	setsid sh -c "exec /usr/sbin/fm160-keepalive run $fam" </dev/null >/dev/null 2>&1 &
+}
+
 start() {
+	if [ "$(ka_split)" = 1 ]; then
+		start_one 4
+		start_one 6
+		return 0
+	fi
 	local pid
 	[ "$(ka_enable)" = 0 ] && return 0
 	pid=$(cat "$PIDFILE" 2>/dev/null)
@@ -356,38 +432,108 @@ start() {
 }
 
 stop() {
-	local pid
-	pid=$(cat "$PIDFILE" 2>/dev/null)
-	if [ -n "$pid" ]; then
-		kill "$pid" 2>/dev/null
-		sleep 1
-		kill -9 "$pid" 2>/dev/null
-	fi
-	rm -f "$PIDFILE" "$STATE"
+	# always clear all three: a split->combined toggle must not leave an
+	# orphan single-family daemon behind
+	local f pid
+	for f in "" .4 .6; do
+		pid=$(cat "$BASE$f.pid" 2>/dev/null)
+		if [ -n "$pid" ]; then
+			kill "$pid" 2>/dev/null
+			sleep 1
+			kill -9 "$pid" 2>/dev/null
+		fi
+		rm -f "$BASE$f.pid" "$BASE$f.state"
+	done
 }
 
 jstr() { printf '"%s"' "$(echo "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
 
-status() {
-	local state= idle last_check= last_targets= consec_fail=0 window_rounds=0 reloads=0 total_rounds=0 last_reload= last_reload_at=0
-	[ -f "$STATE" ] && . "$STATE"
+# emit the counter JSON for one state file; $1 = suffix ("" | ".4" | ".6")
+state_json() {
+	local sfx=$1
+	local state= idle last_check= last_targets= consec_fail=0 window_rounds=0
+	local reloads=0 total_rounds=0 last_reload= last_reload_at=0
+	[ -f "$BASE$sfx.state" ] && . "$BASE$sfx.state"
 	local s=${state:-idle}
-	[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null || { [ "$s" = running ] && s=dead; }
-	cat <<EOF
-{"enable": $(ka_enable), "interval": $(ka_interval),
+	[ -f "$BASE$sfx.pid" ] && kill -0 "$(cat "$BASE$sfx.pid")" 2>/dev/null || { [ "$s" = running ] && s=dead; }
+	printf '{"state": "%s", "last_check": "%s", "last_targets": %s, "consec_fail": %s, "window_rounds": %s, "reloads": %s, "total_rounds": %s, "last_reload": "%s", "last_reload_at": %s}' \
+		"$s" "$last_check" "$(jstr "$last_targets")" "${consec_fail:-0}" \
+		"${window_rounds:-0}" "${reloads:-0}" "${total_rounds:-0}" \
+		"$last_reload" "${last_reload_at:-0}"
+}
+
+status() {
+	local ka_int ka_int6
+	ka_int=$(ka_interval)
+	ka_int6=$(ucig ka_interval6); [ -z "$ka_int6" ] && ka_int6=$((ka_int * 2))
+	if [ "$(ka_split)" = 1 ]; then
+		# per-family detail + a worst-of aggregate at top level so pages
+		# reading only the classic fields keep working
+		local st4=idle chk4= c4=0 w4=0 r4=0 t4=0 lr4= at4=0
+		local st6=idle chk6= c6=0 w6=0 r6=0 t6=0 lr6= at6=0
+		local state= last_check= consec_fail=0 window_rounds=0 reloads=0
+		local total_rounds=0 last_reload= last_reload_at=0
+		if [ -f "$BASE.4.state" ]; then
+			state=; last_check=; consec_fail=0; window_rounds=0; reloads=0; total_rounds=0; last_reload=; last_reload_at=0
+			. "$BASE.4.state"
+			st4=${state:-idle}; chk4=$last_check; c4=${consec_fail:-0}; w4=${window_rounds:-0}
+			r4=${reloads:-0}; t4=${total_rounds:-0}; lr4=$last_reload; at4=${last_reload_at:-0}
+			kill -0 "$(cat "$BASE.4.pid" 2>/dev/null)" 2>/dev/null || { [ "$st4" = running ] && st4=dead; }
+		fi
+		if [ -f "$BASE.6.state" ]; then
+			state=; last_check=; consec_fail=0; window_rounds=0; reloads=0; total_rounds=0; last_reload=; last_reload_at=0
+			. "$BASE.6.state"
+			st6=${state:-idle}; chk6=$last_check; c6=${consec_fail:-0}; w6=${window_rounds:-0}
+			r6=${reloads:-0}; t6=${total_rounds:-0}; lr6=$last_reload; at6=${last_reload_at:-0}
+			kill -0 "$(cat "$BASE.6.pid" 2>/dev/null)" 2>/dev/null || { [ "$st6" = running ] && st6=dead; }
+		fi
+		local agg_state="$st4/$st6"
+		local agg_con=$c4; [ "$c6" -gt "$c4" ] && agg_con=$c6
+		local agg_win=$w4; [ "$w6" -gt "$w4" ] && agg_win=$w6
+		local agg_lr=$lr4
+		{ [ "$lr4" = 0 ] || [ "$lr6" = 0 ]; } && agg_lr=0
+		printf '{"enable": %s, "split": 1, "interval": %s, "interval6": %s,\n' "$(ka_enable)" "$ka_int" "$ka_int6"
+		printf ' "reload_rounds": %s, "stop_rounds": %s,\n' "$(ka_reload)" "$(ka_stop)"
+		printf ' "dns4": %s, "dns6": %s, "dns4_2": %s, "dns6_2": %s,\n' \
+			"$(jstr "$(ka_dns4)")" "$(jstr "$(ka_dns6)")" "$(jstr "$(ka_dns4_2)")" "$(jstr "$(ka_dns6_2)")"
+		printf ' "state": %s, "last_check": %s, "last_targets": %s,\n' \
+			"$(jstr "$agg_state")" "$(jstr "v4:$chk4 v6:$chk6")" "$(jstr "v4+v6")"
+		printf ' "consec_fail": %s, "window_rounds": %s, "reloads": %s, "total_rounds": %s,\n' \
+			"$agg_con" "$agg_win" "$((r4 + r6))" "$((t4 + t6))"
+		printf ' "last_reload": "%s", "last_reload_at": %s,\n' "$agg_lr" "$((at4 > at6 ? at4 : at6))"
+		printf ' "v4": %s, "v6": %s}\n' "$(state_json .4)" "$(state_json .6)"
+	else
+		local state= idle last_check= last_targets= consec_fail=0 window_rounds=0 reloads=0 total_rounds=0 last_reload= last_reload_at=0
+		[ -f "$STATE" ] && . "$STATE"
+		local s=${state:-idle}
+		[ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null || { [ "$s" = running ] && s=dead; }
+		cat <<EOF
+{"enable": $(ka_enable), "split": 0, "interval": $ka_int, "interval6": $ka_int6,
  "reload_rounds": $(ka_reload), "stop_rounds": $(ka_stop),
  "dns4": $(jstr "$(ka_dns4)"), "dns6": $(jstr "$(ka_dns6)"),
+ "dns4_2": $(jstr "$(ka_dns4_2)"), "dns6_2": $(jstr "$(ka_dns6_2)"),
  "state": "$s", "last_check": "$last_check", "last_targets": $(jstr "$last_targets"),
  "consec_fail": ${consec_fail:-0}, "window_rounds": ${window_rounds:-0},
  "reloads": ${reloads:-0}, "total_rounds": ${total_rounds:-0},
  "last_reload": "$last_reload", "last_reload_at": ${last_reload_at:-0}}
 EOF
+	fi
 }
 
 case "$1" in
-	run)    run ;;
+	run)
+		[ -n "$2" ] && FAM=$2
+		case "$FAM" in
+			""|4|6) ;;
+			*) echo "usage: $0 run [4|6]" >&2; exit 2 ;;
+		esac
+		if [ -n "$FAM" ]; then
+			STATE=$BASE.$FAM.state
+			PIDFILE=$BASE.$FAM.pid
+		fi
+		run ;;
 	start)  start ;;
 	stop)   stop ;;
 	status) status ;;
-	*) echo "usage: $0 {run|start|stop|status}" >&2; exit 2 ;;
+	*) echo "usage: $0 {run [4|6]|start|stop|status}" >&2; exit 2 ;;
 esac

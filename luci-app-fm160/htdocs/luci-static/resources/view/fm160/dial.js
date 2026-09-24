@@ -282,6 +282,20 @@ return view.extend({
 			'type': 'text', 'class': 'cbi-input-text', 'style': 'width:16em',
 			'value': ka.dns6 || '', 'placeholder': _('auto (module DNS)')
 		});
+		var kaDns4b = E('input', {
+			'type': 'text', 'class': 'cbi-input-text', 'style': 'width:16em',
+			'value': ka.dns4_2 || '', 'placeholder': _('AliDNS 223.5.5.5')
+		});
+		var kaDns6b = E('input', {
+			'type': 'text', 'class': 'cbi-input-text', 'style': 'width:16em',
+			'value': ka.dns6_2 || '', 'placeholder': _('AliDNS 2400:3200::1')
+		});
+		var kaSplit = E('input', { 'type': 'checkbox', 'name': 'ka_split' });
+		if ((ka.split === undefined ? 0 : ka.split) === 1) kaSplit.checked = true;
+		var kaInt6 = E('input', {
+			'type': 'text', 'class': 'cbi-input-text', 'style': 'width:6em',
+			'value': ka.interval6 || '', 'placeholder': _('interval x 2')
+		});
 
 		function modeIs(m) {
 			var r = modeBox.querySelector('input[name=dial_mode]:checked');
@@ -305,7 +319,9 @@ return view.extend({
 				v4Chk: v4Chk, v6Chk: v6Chk, chanSelect: chanSelect,
 				prefixChk: prefixChk, autoChk: autoChk,
 				kaChk: kaChk, kaInterval: kaInterval, kaReload: kaReload,
-				kaStop: kaStop, kaDns4: kaDns4, kaDns6: kaDns6
+				kaStop: kaStop, kaDns4: kaDns4, kaDns6: kaDns6,
+				kaDns4b: kaDns4b, kaDns6b: kaDns6b, kaSplit: kaSplit,
+				kaInt6: kaInt6
 			})
 		}, _('Save settings'));
 
@@ -333,14 +349,32 @@ return view.extend({
 					E('td', { 'class': 'td' }, kaDns4)
 				]),
 				E('tr', { 'class': 'tr' }, [
+					E('td', { 'class': 'td' }, _('Backup IPv4 target (empty = AliDNS 223.5.5.5)')),
+					E('td', { 'class': 'td' }, kaDns4b)
+				]),
+				E('tr', { 'class': 'tr' }, [
 					E('td', { 'class': 'td' }, _('Ping target IPv6 (empty = module DNS)')),
 					E('td', { 'class': 'td' }, kaDns6)
+				]),
+				E('tr', { 'class': 'tr' }, [
+					E('td', { 'class': 'td' }, _('Backup IPv6 target (empty = AliDNS 2400:3200::1)')),
+					E('td', { 'class': 'td' }, kaDns6b)
+				]),
+				E('tr', { 'class': 'tr' }, [
+					E('td', { 'class': 'td' }, _('Split into separate v4 / v6 watchdogs')),
+					E('td', { 'class': 'td' }, kaSplit)
+				]),
+				E('tr', { 'class': 'tr' }, [
+					E('td', { 'class': 'td' }, _('v6 check interval (seconds, empty = v4 interval x 2)')),
+					E('td', { 'class': 'td' }, kaInt6)
 				])
 			]),
 			E('p', { 'class': 'hint' }, [
-				_('Every interval the module-reported DNS is pinged over the carrier path (IPv4/IPv6 honouring the stack toggles).'),
+				_('Every interval two targets per family are pinged over the carrier path (primary: module DNS or the override; backup: AliDNS).'),
 				' ',
-				_('A failed round triggers a redial; after the consecutive-failure threshold the module USB profile is bounced and reloaded; after the 24 h budget is exhausted the watchdog stops by itself.')
+				_('A family only fails when ALL its targets time out (8 s each). A failed round triggers a redial; after the consecutive-failure threshold the module USB profile is bounced and reloaded; after the 24 h budget is exhausted the watchdog stops by itself.'),
+				' ',
+				_('With split watchdogs the v4 and v6 sides run as independent daemons with their own counters; the v6 side polls at half frequency by default.')
 			])
 		]);
 
@@ -405,8 +439,14 @@ return view.extend({
 		var kaStp = parseInt(fields.kaStop.value, 10);
 		var ka4 = fields.kaDns4.value.trim();
 		var ka6 = fields.kaDns6.value.trim();
+		var ka4b = fields.kaDns4b.value.trim();
+		var ka6b = fields.kaDns6b.value.trim();
+		var kaInt6s = fields.kaInt6.value.trim();
 		if (isNaN(kaInt) || kaInt < 10 || kaInt > 600) {
 			fail(_('Check interval must be 10-600 seconds.')); return;
+		}
+		if (kaInt6s !== '' && (isNaN(parseInt(kaInt6s, 10)) || parseInt(kaInt6s, 10) < 10 || parseInt(kaInt6s, 10) > 1200)) {
+			fail(_('v6 check interval must be 10-1200 seconds (or empty = v4 interval x 2).')); return;
 		}
 		if (isNaN(kaRel) || kaRel < 2 || kaRel > 50) {
 			fail(_('Module reload threshold must be 2-50 rounds.')); return;
@@ -417,8 +457,14 @@ return view.extend({
 		if (ka4 && !/^[0-9.]+$/.test(ka4)) {
 			fail(_('IPv4 ping target may only contain digits and dots (or empty).')); return;
 		}
+		if (ka4b && !/^[0-9.]+$/.test(ka4b)) {
+			fail(_('Backup IPv4 target may only contain digits and dots (or empty).')); return;
+		}
 		if (ka6 && ka6.indexOf(':') < 0) {
 			fail(_('IPv6 ping target must be an IPv6 address (or empty).')); return;
+		}
+		if (ka6b && ka6b.indexOf(':') < 0) {
+			fail(_('Backup IPv6 target must be an IPv6 address (or empty).')); return;
 		}
 
 		var ops = [
@@ -434,7 +480,11 @@ return view.extend({
 			[ 'set', 'ka_reload_rounds', String(kaRel) ],
 			[ 'set', 'ka_stop_rounds', String(kaStp) ],
 			[ 'set', 'ka_dns4', ka4 ],
-			[ 'set', 'ka_dns6', ka6 ]
+			[ 'set', 'ka_dns6', ka6 ],
+			[ 'set', 'ka_dns4_2', ka4b ],
+			[ 'set', 'ka_dns6_2', ka6b ],
+			[ 'set', 'ka_split', fields.kaSplit.checked ? '1' : '0' ],
+			[ 'set', 'ka_interval6', kaInt6s ]
 		];
 
 		var chain = Promise.resolve();

@@ -49,7 +49,7 @@ ensure_section() {
 	uci add_list "$CFG.mwan3.track_ip4=223.5.5.5" >/dev/null
 	uci add_list "$CFG.mwan3.track_ip6=2400:3200::1" >/dev/null
 	uci set "$CFG.mwan3.count=1" >/dev/null
-	uci set "$CFG.mwan3.timeout=2" >/dev/null
+	uci set "$CFG.mwan3.timeout=4" >/dev/null
 	uci set "$CFG.mwan3.interval=5" >/dev/null
 	uci set "$CFG.mwan3.failure_interval=5" >/dev/null
 	uci set "$CFG.mwan3.down=3" >/dev/null
@@ -135,7 +135,7 @@ do_sync() {
 	mobile_metric=$(g mobile_metric); mobile_metric=${mobile_metric:-20}
 	mobile_weight=$(g mobile_weight); mobile_weight=${mobile_weight:-1}
 	count=$(g count);           count=${count:-1}
-	timeout=$(g timeout);       timeout=${timeout:-2}
+	timeout=$(g timeout);       timeout=${timeout:-4}
 	interval=$(g interval);     interval=${interval:-5}
 	failure_interval=$(g failure_interval); failure_interval=${failure_interval:-5}
 	down=$(g down);             down=${down:-3}

@@ -8,7 +8,9 @@
 # Keys: dial_mode(ecm|qmap|mbim) dial_apn dial_v4(0|1) dial_v6(0|1)
 #       qmap_channels(1-4) dial_autostart(0|1) lan_ipv6(0|1)
 #       ka_enable(0|1) ka_interval(s) ka_reload_rounds ka_stop_rounds
-#       ka_dns4 ka_dns6 (empty = auto from module-reported DNS)
+#       ka_dns4 ka_dns6 ka_dns4_2 ka_dns6_2 (empty = auto: module DNS,
+#       secondary falls back to AliDNS 223.5.5.5 / 2400:3200::1)
+#       ka_split(0|1) ka_interval6(s, empty = ka_interval x 2)
 . /lib/functions.sh
 CFG=fm160
 
@@ -182,23 +184,25 @@ case "$CMD" in
 		case "$K" in
 			dial_mode)     valid_mode "$V"     || { echo '{"ok":false,"error":"bad mode"}'; exit 1; } ;;
 			dial_apn)      valid_apn "$V"      || { echo '{"ok":false,"error":"bad apn"}'; exit 1; } ;;
-			dial_v4|dial_v6|dial_autostart|lan_ipv6|ka_enable)
+			dial_v4|dial_v6|dial_autostart|lan_ipv6|ka_enable|ka_split)
 					valid_bool "$V"     || { echo '{"ok":false,"error":"bad bool"}'; exit 1; } ;;
 			qmap_channels) valid_channels "$V" || { echo '{"ok":false,"error":"bad channels"}'; exit 1; } ;;
 			ka_interval)      valid_int "$V" 10 600   || { echo '{"ok":false,"error":"bad interval (10-600)"}'; exit 1; } ;;
+			ka_interval6)     { [ -z "$V" ] || valid_int "$V" 10 1200; } || { echo '{"ok":false,"error":"bad v6 interval (10-1200 or empty)"}'; exit 1; } ;;
 			ka_reload_rounds) valid_int "$V" 2 50    || { echo '{"ok":false,"error":"bad reload rounds (2-50)"}'; exit 1; } ;;
 			ka_stop_rounds)   valid_int "$V" 2 100   || { echo '{"ok":false,"error":"bad stop rounds (2-100)"}'; exit 1; } ;;
-			ka_dns4)       valid_ipv4 "$V"      || { echo '{"ok":false,"error":"bad IPv4 DNS"}'; exit 1; } ;;
-			ka_dns6)       valid_ipv6 "$V"      || { echo '{"ok":false,"error":"bad IPv6 DNS"}'; exit 1; } ;;
+			ka_dns4|ka_dns4_2) valid_ipv4 "$V"     || { echo '{"ok":false,"error":"bad IPv4 DNS"}'; exit 1; } ;;
+			ka_dns6|ka_dns6_2) valid_ipv6 "$V"     || { echo '{"ok":false,"error":"bad IPv6 DNS"}'; exit 1; } ;;
 			*) echo '{"ok":false,"error":"unknown key"}'; exit 1 ;;
 		esac
 		ucis "$K" "$V"; uci_commit
 		# keep ECM pdp in sync when the stack toggles change it
 		ucis dial_pdp "$(pdp_for)"
 		uci_commit
-		# 保活开关即时生效
+		# 保活开关即时生效；拆分/间隔调整重启守护（stop 会清掉所有实例）
 		case "$K" in
-			ka_enable) if [ "$V" = 1 ]; then /usr/sbin/fm160-keepalive start; else /usr/sbin/fm160-keepalive stop; fi ;;
+			ka_enable) if [ "$V" = 1 ]; then /usr/sbin/fm160-keepalive stop; /usr/sbin/fm160-keepalive start; else /usr/sbin/fm160-keepalive stop; fi ;;
+			ka_split|ka_interval|ka_interval6) /usr/sbin/fm160-keepalive stop; /usr/sbin/fm160-keepalive start ;;
 		esac
 			/usr/sbin/fm160-oplog add dial-ctl 设置变更 "$K=$V" 已保存
 			echo '{"ok":true}' ;;

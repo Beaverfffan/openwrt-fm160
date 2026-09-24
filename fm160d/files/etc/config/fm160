@@ -87,11 +87,16 @@ config fm160 'main'
 	# A failed round redials; ka_reload_rounds consecutive failures bounce the
 	# USB profile (module reload) and redial; ka_stop_rounds failed rounds
 	# inside a sliding 24 h window make the watchdog give up and report.
-	# ka_dns4/ka_dns6 override the ping targets per family (unset = auto).
+	# Two targets per family: ka_dns4/ka_dns6 (unset = module DNS) and
+	# ka_dns4_2/ka_dns6_2 (unset = AliDNS 223.5.5.5 / 2400:3200::1); a family
+	# only fails when ALL its targets time out (ping timeout 8 s each).
+	# ka_split=1 runs two independent watchdogs (run 4 / run 6); the v6 one
+	# polls at ka_interval6, unset = ka_interval x 2.
 	option ka_enable '1'
 	option ka_interval '30'
 	option ka_reload_rounds '5'
 	option ka_stop_rounds '10'
+	option ka_split '0'
 
 	# Let the reconnect ladder end in AT+CFUN=1,1 (a module reset).  Off by
 	# default, and the default is the safety property: with it off the
