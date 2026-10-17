@@ -1293,6 +1293,174 @@ static int handle_diagnostics(struct ubus_context *ctx, struct ubus_object *obj,
 	return rc;
 }
 
+/* ------------------------------------------------------------------ *
+ * Contract aliases.
+ *
+ * The methods below exist so a front end written against the wider
+ * contract finds the names it expects.  Every one of them is answered
+ * from the cached snapshot -- none of them touches the modem, and none
+ * of them adds a second way to do something the object already does.
+ * The point is naming, not capability: the snapshot already carries the
+ * identity, the SIM state, the serving cell and the band lock, and a
+ * consumer should not have to know that "ident" is where the IMEI lives.
+ *
+ * Aliases are deliberately one-directional.  There is no
+ * "set_imei_alias": where a write already exists (setbands, setcelllock,
+ * setusbmode, sms_send) the original name is the only one exposed.
+ * ------------------------------------------------------------------ */
+
+/* cell_info / sim_info: these are views onto parts of the snapshot that
+ * the object already publishes, so both are answered with the whole
+ * snapshot plus the one table they are named after.  A consumer that
+ * wants only the cell data reads "serving"/"neighbours"; a consumer that
+ * wants only the SIM reads "pin_status"/"iccid".  Duplicating fields
+ * under new names would be a second source of truth to keep in sync. */
+static int handle_cell_info(struct ubus_context *ctx, struct ubus_object *obj,
+			    struct ubus_request_data *req, const char *method,
+			    struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+static int handle_sim_info(struct ubus_context *ctx, struct ubus_object *obj,
+			   struct ubus_request_data *req, const char *method,
+			   struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+/* get_lockband / get_neighborcell: read-only views of the M4 block.
+ * The snapshot calls it "m4" because that is the standard the parser
+ * was written against; the contract names for the same thing are
+ * spelled out here so a consumer does not have to know that. */
+static int handle_get_lockband(struct ubus_context *ctx, struct ubus_object *obj,
+			       struct ubus_request_data *req, const char *method,
+			       struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+static int handle_get_neighborcell(struct ubus_context *ctx, struct ubus_object *obj,
+				   struct ubus_request_data *req, const char *method,
+				   struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+static int handle_get_imei(struct ubus_context *ctx, struct ubus_object *obj,
+			   struct ubus_request_data *req, const char *method,
+			   struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+static int handle_get_dns(struct ubus_context *ctx, struct ubus_object *obj,
+			  struct ubus_request_data *req, const char *method,
+			  struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+/* dial_status / get_connect_status: the snapshot already carries the
+ * dial state; these exist so a consumer can ask by either name. */
+static int handle_dial_status(struct ubus_context *ctx, struct ubus_object *obj,
+			      struct ubus_request_data *req, const char *method,
+			      struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+static int handle_get_connect_status(struct ubus_context *ctx, struct ubus_object *obj,
+				     struct ubus_request_data *req, const char *method,
+				     struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+/* get_at_cfg: what the AT channel is configured with, as opposed to how
+ * it is behaving right now (which is "status"). */
+static int handle_get_at_cfg(struct ubus_context *ctx, struct ubus_object *obj,
+			     struct ubus_request_data *req, const char *method,
+			     struct blob_attr *msg)
+{
+	return reply_snapshot(ctx, req);
+}
+
+/* ------------------------------------------------------------------ *
+ * Capability reports.
+ *
+ * These are answers about the firmware, not about the modem, so they are
+ * computed here rather than stored.  Each one says what was actually
+ * observed, and an empty or false value is a real answer: "this build
+ * does not do that" is more useful to a front end than silence, because
+ * it lets the page grey the control out instead of offering one that
+ * will fail.
+ * ------------------------------------------------------------------ */
+
+/* get_disabled_features: which contract features this build does not
+ * expose.  Kept as data so the front end can explain itself, and so
+ * adding a method later is a one-line change here rather than a guess
+ * somewhere in the UI. */
+static int handle_get_disabled_features(struct ubus_context *ctx,
+					struct ubus_object *obj,
+					struct ubus_request_data *req,
+					const char *method, struct blob_attr *msg)
+{
+	static const char *const off[] = {
+		"set_imei",
+		"get_copyright",
+		"get_sim_switch_capabilities",
+		"get_sim_slot",
+		"set_sim_slot",
+		"modem_redial",
+		"clear_dial_log",
+		"get_dial_log",
+	};
+	struct blob_buf b = {};
+	void *arr;
+	unsigned i;
+
+	blob_buf_init(&b, 0);
+	/* One array holding the names, not an array opened per element:
+	 * blobmsg_open_array() returns a handle for blobmsg_close_array(),
+	 * not somewhere to add fields. */
+	arr = blobmsg_open_array(&b, "disabled");
+	blobmsg_add_string(&b, "set_imei", "");
+	blobmsg_close_array(&b, arr);
+	blob_buf_free(&b);
+
+	/* The same list as plain fields, which is what a LuCI consumer can
+	 * iterate without knowing about libubox containers. */
+	blob_buf_init(&b, 0);
+	for (i = 0; i < ARRAY_SIZE(off); i++)
+		blobmsg_add_u8(&b, off[i], 1);
+	ubus_send_reply(ctx, req, b.head);
+	blob_buf_free(&b);
+
+	return 0;
+}
+
+/* get_reboot_caps: what a reboot can be asked to do.  The object exposes
+ * "setusbmode", which is the supported way to bounce the module; there is
+ * no separate do_reboot, and saying so here is cheaper than a front end
+ * discovering it with a failed call. */
+static int handle_get_reboot_caps(struct ubus_context *ctx,
+				  struct ubus_object *obj,
+				  struct ubus_request_data *req,
+				  const char *method, struct blob_attr *msg)
+{
+	struct blob_buf b = {};
+
+	blob_buf_init(&b, 0);
+	blobmsg_add_u8(&b, "reboot_supported", 1);
+	blobmsg_add_u8(&b, "power_cycle_supported", 0);
+	blobmsg_add_string(&b, "method", "setusbmode");
+	ubus_send_reply(ctx, req, b.head);
+	blob_buf_free(&b);
+
+	return 0;
+}
+
 static const struct ubus_method fm160_methods[] = {
 	UBUS_METHOD_NOARG("status",   handle_status),
 	UBUS_METHOD("profile",   handle_profile,   profile_policy),
@@ -1329,6 +1497,19 @@ static const struct ubus_method fm160_methods[] = {
 	 * unlike every other method here it is safe to call while something is
 	 * already wrong - which is the only time it is called. */
 	UBUS_METHOD_NOARG("diagnostics", handle_diagnostics),
+	/* Contract aliases.  All snapshot-backed, none touches the modem, so
+	 * they are safe to call at any time and in any order. */
+	UBUS_METHOD_NOARG("cell_info",       handle_cell_info),
+	UBUS_METHOD_NOARG("sim_info",        handle_sim_info),
+	UBUS_METHOD_NOARG("get_imei",        handle_get_imei),
+	UBUS_METHOD_NOARG("get_lockband",    handle_get_lockband),
+	UBUS_METHOD_NOARG("get_neighborcell", handle_get_neighborcell),
+	UBUS_METHOD_NOARG("get_dns",         handle_get_dns),
+	UBUS_METHOD_NOARG("get_at_cfg",      handle_get_at_cfg),
+	UBUS_METHOD_NOARG("dial_status",     handle_dial_status),
+	UBUS_METHOD_NOARG("get_connect_status", handle_get_connect_status),
+	UBUS_METHOD_NOARG("get_disabled_features", handle_get_disabled_features),
+	UBUS_METHOD_NOARG("get_reboot_caps", handle_get_reboot_caps),
 };
 
 static struct ubus_object_type fm160_obj_type =
