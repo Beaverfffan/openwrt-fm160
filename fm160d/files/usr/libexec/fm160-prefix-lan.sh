@@ -208,6 +208,20 @@ enabled() {
 # ECM is usb0 on this unit, but the name is a function of the USB profile and
 # the module's descriptor, and hardcoding it is how a plugin works on exactly
 # one firmware.
+#
+# QMAP (GTUSBMODE 32, qmi_wwan_f) splits the link in two and this is where it
+# bites:
+#
+#   wwan0     the PARENT.  The dialer binds here (-i) and reads driver attributes
+#             off it, but it never holds an address of its own.
+#   wwan0_1   the mux DATA port.  The address the dialer configured lives here,
+#             and it is this netdev that netifd's DHCP and the /64 are on.
+#
+# So under QMAP the mobile link is wwan0_1, and a candidate list of "usb0 wwan0"
+# either picks the parent (no address -> wan_prefix() returns empty -> the LAN
+# silently keeps its ULA) or, if the parent somehow does hold a global address,
+# reads the prefix off the wrong interface.  wwan0_1 is therefore probed BEFORE
+# wwan0, and the general wwanN._M form is covered after both.
 wan_dev() {
 	local d
 	d="$(cfg_get lan_ipv6_wan)"
@@ -215,6 +229,16 @@ wan_dev() {
 		echo "$d"
 		return 0
 	fi
+
+	# QMAP mux data ports first: wwan0_1 is the one that carries the address.
+	for d in $(ls -1 /sys/class/net 2>/dev/null | grep -E '^wwan[0-9]+_[0-9]+$' | sort); do
+		[ -d "/sys/class/net/$d" ] || continue
+		if ip -6 addr show dev "$d" scope global 2>/dev/null | grep -qi 'inet6'; then
+			echo "$d"
+			return 0
+		fi
+	done
+
 	for d in usb0 wwan0 eth1; do
 		[ -d "/sys/class/net/$d" ] || continue
 		# the mobile link is the one holding a global, non-ula address
@@ -241,13 +265,28 @@ lan_dev() {
 #
 # ula (fc00::/7) and link-local are skipped on purpose -- the ULA is the router's
 # own, and letting it through would put the ULA on br-lan twice.
+#
+# QMAP is NOT assumed here.  Under qmi_wwan_f the dialer configures a point to
+# point IPv6 and the address can come up as /128 rather than /64.  A /128 is not
+# a prefix: there is nothing in it that says the operator delegated the enclosing
+# /64 to this PDN, so promoting its first four groups to a LAN prefix would be a
+# guess -- and a wrong guess here is exactly the failure this whole script exists
+# to prevent (a prefix on br-lan that the module cannot resolve, breaking inbound
+# traffic).  So the strict /64 test stands by default.
+#
+# If a build is observed to hand out a /128 that really does carry the delegated
+# /64, set lan_ipv6_accept to 128 to let it through deliberately.  That is an
+# opt-in on evidence, not a default, and it should be recorded next to whatever
+# measurement justified it.
 wan_prefix() {
-	local dev="$1" p
-	p="$(ip -6 addr show dev "$dev" scope global 2>/dev/null | awk '
+	local dev="$1" p accept
+	accept="$(cfg_get lan_ipv6_accept)"
+	[ -n "$accept" ] || accept=64
+	p="$(ip -6 addr show dev "$dev" scope global 2>/dev/null | awk -v want="$accept" '
 		/inet6/ {
 			addr = $2
 			split(addr, a, "/")
-			if (a[2] != 64) next
+			if (a[2] != want) next
 			# fc00::/7 and fe80::/10 are not the operator prefix
 			if (a[1] ~ /^f[cd]/ || a[1] ~ /^fe[89ab]/) next
 			n = split(a[1], g, ":")
@@ -774,8 +813,19 @@ status() {
 	printf 'enabled        %s\n' "$(enabled && echo yes || echo no)"
 	printf 'wan device     %s\n' "$dev"
 	printf 'lan device     %s\n' "$lan"
+	printf 'accept length  %s\n' "$(cfg_get lan_ipv6_accept || echo 64)"
 	printf 'operator /64   %s\n' "${pfx:+$pfx::/64}"
 	printf 'installed      %s\n' "${old:+$old::/64}${wandev:+ (from $wandev)}"
+
+	# Every global address on every plausible mobile netdev, with its prefix
+	# length.  Under QMAP the answer usually lives here: the parent wwan0 holds
+	# nothing, the mux port wwan0_1 holds the address, and whether that address
+	# came up /64 or /128 is the thing to look at before deciding anything about
+	# lan_ipv6_accept.  Printed unconditionally because a silent /64 on the LAN
+	# is the symptom, not the diagnosis.
+	printf 'globals        %s\n' "$(ip -6 addr show 2>/dev/null | awk '
+		/^[0-9]+: / { dev = $2; sub(/:$/, "", dev) }
+		/inet6 .* scope global/ { print dev " " $2 }' | grep -Ev ' (fd|fe80)' | tr '\n' ' ')"
 	printf 'lan address    %s\n' "$(ip -6 addr show dev "$lan" scope global 2>/dev/null | awk '/inet6/ {print $2}' | grep -v '^fd' | tr '\n' ' ')"
 	printf 'lan route      %s\n' "$(ip -6 route show "$pfx::/64" 2>/dev/null | head -1)"
 	printf 'wan network    %s\n' "${wanseg:-?}"

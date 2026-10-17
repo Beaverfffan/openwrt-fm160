@@ -141,10 +141,26 @@ config fm160 'main'
 
 	# Optional: pin the mobile netdev instead of auto-detecting it.  Leave unset; the
 	# name depends on the USB profile.
+	#
+	# Under QMAP (GTUSBMODE 32, qmi_wwan_f) the mobile link is the mux DATA port
+	# wwan0_1, not the parent wwan0: the dialer binds to the parent but the address
+	# the dialer configured lives on the data port, and that is the netdev netifd's
+	# DHCP and the /64 are on.  Auto-detection probes wwanN_M before wwan0 for this
+	# reason.  Pin it here only if auto-detect gets it wrong on your build.
 	# option lan_ipv6_wan 'usb0'
 
 	# Optional: the LAN bridge to put the operator prefix on.  br-lan by default.
 	# option lan_ipv6_if 'br-lan'
+
+	# Optional: which prefix length counts as the operator prefix.  64 by default,
+	# and it is right for ECM (GTUSBMODE 33), which announces a /64 on the link.
+	#
+	# Do not set this to 128 just because a QMAP link showed a /128.  A /128 is a
+	# point-to-point address, not a prefix: nothing in it says the operator delegated
+	# the enclosing /64 to this PDN, and putting a guessed prefix on br-lan is what
+	# breaks inbound traffic.  Only set it to 128 if you have measured that the
+	# /128 really does carry the delegated /64, and note that measurement here.
+	# option lan_ipv6_accept '64'
 
 # The module-reset audit trail (DESIGN 4.3).  Written by fm160d, not by hand;
 # it lives in its own section because it has to survive a restart: without the
